@@ -27,18 +27,13 @@ int main(int argc, char **argv) {
 		printf("initial_power power_reduction < input_file\n");
 		return 1;
 	}	
-	const int init_range = (int) *argv[1] - 48;
-	const int jump_range = (int) *argv[2] - 48;
-	const int num_jumps = (int) *argv[3] - 48;
-	const int init_power = (int) *argv[4] - 48;
-	const double power_reduc = (double) (*argv[5]);
+	int init_ran, jump_ran, num_jumps, init_power;
+	double power_red;
 
-	printf("initial range: %d\n", init_range);
-	printf("jump range: %d\n", jump_range);
-	printf("num jumps: %d\n", num_jumps);
-	printf("initial power: %d\n", init_power);
-	printf("power reduction: %f\n", power_reduc);
 	// TODO - Read in input
+	sscanf(argv[1], "%d", &init_ran);	
+	// Store argv values
+	printf("initial range: %d\n", init_ran);
 	
 	// TODO - Print out input 
 
