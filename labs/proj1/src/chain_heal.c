@@ -5,13 +5,14 @@
 #include <unistd.h>
 
 typedef struct Node {
-	char *name;
+	char name[101];
 	int x_crd, y_crd;
 	int cur_pp, max_pp;
 	int visited;
 	struct Node *prev;
 } Node;
 
+// DFS somehow
 int main(int argc, char **argv) {
 	// Error check argv values
 	if(argc != 6) {
@@ -20,6 +21,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}	
 
+	// argv variables 
 	int init_ran, jump_ran, num_jumps, init_power;
 	double power_red;
 
@@ -32,38 +34,45 @@ int main(int argc, char **argv) {
 	sscanf(argv[4], "%d", &init_power);	
 	sscanf(argv[5], "%lf", &power_red);	
 
-	// TODO - Read In Input From stdin
+	char *tmp_line = NULL;			// For getline
+	size_t tmp_size = 0;				// For getline
 
-	int node_count = 0;
-	char *line = NULL;
-	size_t size = 0;
-	Node *last_node = NULL;
+	Node *last_node = NULL; // For chaining Nodes
+	int list_size = 0;			// Keep count of Nodes
 
-	while(getline(&line, &size, stdin) > -1) {
+	// Loop to read stdin
+	// REF - Keith Scroggs talked about using getline instead of just scanf for each line
+	while(getline(&tmp_line, &tmp_size, stdin) > -1) {
 		Node *n = (Node*)malloc(sizeof(Node));
+		sscanf(tmp_line, "%d %d %d %d %s", &(n->x_crd), &(n->y_crd), &(n->cur_pp), &(n->max_pp), n->name);		
 
-		char temp[50];			 			// Use temp string for n->name
-		sscanf(line, "%d %d %d %d %s", &n->x_crd, &n->y_crd, &n->cur_pp, &n->max_pp, temp);		
-		n->name = temp;
-		n->prev = last_node;			// Set Node links
+		n->prev = last_node;	// Set Node links
+		// if(n->prev != NULL) {
+		// 	printf("n: %s		n->p: %s\n", n->name, n->prev->name);
+		// }
+
 		last_node = n;
 
-		node_count++;
+		list_size++;
 	}
-	printf("%d %d %d %d %s\n", last_node->x_crd, last_node->y_crd, last_node->cur_pp, last_node->max_pp, last_node->name);
-	printf("Number of Nodes: %d\n", node_count);
-	free(line);
+	free(tmp_line);
 
-	// TODO - Create Nodes into array
+	// printf("ln: %s		ln->prev: %s\n", last_node->name, last_node->prev->name);
+
+	Node **list = (Node**)malloc(list_size * sizeof(Node));
+	// Put Nodes into list
+	for(int i = list_size-1; i >= 0; i--) {
+		list[i] = last_node;
+		last_node = last_node->prev;
+	}
+
+	for(int i = 0; i < list_size; i++) {
+		printf("%s\n", list[i]->name);
+	}
+
+	// TODO - Make Graph
 
 	// Deleting all Nodes
-	Node *curr = last_node;
-	while(curr != NULL) {
-		Node *next = curr->prev;
-		free(curr);
-		curr = next;
-	}
-	// TODO - Print out input 
-
-
+	for(int i = 0; i < list_size; i++) {	free(list[i]); }
+	free(list);
 }
