@@ -13,11 +13,33 @@ typedef struct Node {
 	struct Node **adj;
 } Node;
 
-// Print out array
+
 void print_arr(Node **arr, const size_t arr_size) {
 	for(size_t i = 0; i < arr_size; i++) {				
 		printf("%s\n", arr[i]->name);
 	}
+}
+
+Node* read_stdin(size_t *size) {
+	Node *last_n = NULL;
+	char *line = NULL;			// For getline
+	size_t line_size = 0;				// For getline
+
+	// While loop to read in stdin and Malloc Nodes 
+	// REF - Keith Scroggs talked about using getline instead of just scanf for each line
+	while(getline(&line, &line_size, stdin) > -1) {
+		Node *n = (Node*)malloc(sizeof(Node));
+		sscanf(line, "%d %d %d %d %s", &(n->x_crd), &(n->y_crd), &(n->cur_pp), &(n->max_pp), n->name);		
+
+		n->adj_size = 0;
+		n->visited = 0;
+		n->prev = last_n;			// Set Node links
+		last_n = n;
+		(*size)++;
+	}
+	free(line);					// Free temporary char*
+
+	return last_n;;
 }
 
 void create_adj(Node **arr, const size_t size, const int jump_range) {
@@ -99,27 +121,11 @@ int main(int argc, char **argv) {
 	sscanf(argv[4], "%d", &init_power);	
 	sscanf(argv[5], "%lf", &power_red);	
 
-
-	char *tmp_line = NULL;			// For getline
-	size_t tmp_size = 0;				// For getline
-	Node *last_n = NULL; 				// previous Node for chaining Nodes
-	size_t arr_size = 0;				// Keep count of Nodes
-
-
-	// While loop to read in stdin and Malloc Nodes 
-	// REF - Keith Scroggs talked about using getline instead of just scanf for each line
-	while(getline(&tmp_line, &tmp_size, stdin) > -1) {
-		Node *n = (Node*)malloc(sizeof(Node));
-		sscanf(tmp_line, "%d %d %d %d %s", &(n->x_crd), &(n->y_crd), &(n->cur_pp), &(n->max_pp), n->name);		
-
-		n->adj_size = 0;
-		n->visited = 0;
-		n->prev = last_n;			// Set Node links
-		last_n = n;
-		arr_size++;
-	}
-	free(tmp_line);					// Free temporary char*
-
+	
+	// Keep count of Nodes
+	size_t arr_size = 0;
+	// previous Node for chaining Nodes
+	Node *last_n = read_stdin(&arr_size);
 	// printf("ln: %s		ln->p: %s\n", last_n->name, last_n->prev->name);
 
 	// Malloc Node array and put Nodes in them
