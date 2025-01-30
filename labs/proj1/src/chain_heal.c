@@ -8,9 +8,9 @@ typedef struct Node {
 	char name[101];
 	int x_crd, y_crd;
 	int cur_pp, max_pp;
-	int visited, adj_size;
+	size_t visited, adj_size;
 	struct Node *prev;
-	struct NOde **adj;
+	struct Node **adj;
 } Node;
 
 // Print out array
@@ -21,40 +21,61 @@ void print_arr(Node **arr, const size_t arr_size) {
 }
 
 void create_adj(Node **arr, const size_t size, const int jump_range) {
-	int dist_squared = jump_range * jump_range;
 	/*	Initialize adjacency graph to keep track of connections
 			REF - https://www.techiedelight.com/initialize-2d-array-with-zeroes-c/ */
-	int grid_2d[size][size];
-	memset(grid_2d, 0, sizeof(grid_2d));		// set every value as 0
+	int matrix[size][size];
+	memset(matrix, 0, sizeof(matrix));		// set every value as 0
+	int dist_squared = jump_range * jump_range;
 
 	// Find connections with jump_range
 	for(size_t i = 0; i < size - 1; i++) {
 		Node *n1 = arr[i];
 		for(size_t j = i+1; j < size; j++) {
 			Node *n2 = arr[j];
+			// Calculate distance
 			int x_diff = n2->x_crd - n1->x_crd;
 			int y_diff = n2->y_crd - n1->y_crd;
 			int total = (x_diff * x_diff) + (y_diff * y_diff);
+			// Continue if jump_range is not enough	
 			if(total > dist_squared) { continue; }
 
 			// Adjust Node's adjacency size and adjacency graph
 			n1->adj_size++;
 			n2->adj_size++;
-			grid_2d[i][j] = 1;
-			grid_2d[j][i] = 1;
+			matrix[i][j] = 1;
+			matrix[j][i] = 1;
 		}
 	}
 
-	// /* 
+	
+	// Put edges into adjacency list
 	for(size_t i = 0; i < size; i++) {
+		Node *n = arr[i];												// Allocate memory for each list
+		n->adj = (Node**)malloc(n->adj_size * sizeof(Node));
+
+		// Use matrix to connect Nodes with edges 
+		size_t index = 0;
 		for(size_t j = 0; j < size; j++) {
-			printf("%d ", grid_2d[i][j]);
+			if(matrix[i][j] == 0) { continue; }	// 0 means no edge
+			n->adj[index] = arr[j];
+			// If adjacency list is full, then break loop
+			if(index++ == n->adj_size) { break;}
+		}
+	}
+	
+
+	// /*	Print out adjacency list
+	for(size_t i = 0; i < size; i++) {
+		Node *n = arr[i];
+		printf("%s:		", n->name);
+		for(size_t j = 0; j < n->adj_size; j++) {
+			printf("%s, ", n->adj[j]->name);
 		}
 		printf("\n");
 	}
 	// */
-	
 }
+
 // DFS somehow
 
 int main(int argc, char **argv) {
