@@ -4,35 +4,45 @@
 #include <math.h>
 #include <unistd.h>
 
+typedef size_t ST;
+
 typedef struct Node {
-	char name[101];
-	int x_crd, y_crd;
-	int cur_pp, max_pp;
-	size_t visited, adj_size;
-	struct Node *prev;
-	struct Node **adj;
+	char name[101], is_start, visited;
+	int X, Y, cur_pp, max_pp;
+	ST adj_size;
+	struct Node *prev, **adj;
 } Node;
 
+typedef struct Global {
+	ST num_jumps, power_red;
+} Global;
 
-void print_arr(Node **arr, const size_t arr_size) {
-	for(size_t i = 0; i < arr_size; i++) {				
-		printf("%s\n", arr[i]->name);
+void print_arr(Node **arr, const ST size) {
+	for(ST i = 0; i < size; i++) {				
+		Node *n = arr[i];
+		printf("%s:		", n->name);
+		for(ST j = 0; j < n->adj_size; j++) {
+			printf("%s	|	 ", n->adj[j]->name);
+		}
+		printf("\n");
 	}
 }
 
-Node* read_stdin(size_t *size) {
+Node* read_stdin(ST *size) {
+
 	Node *last_n = NULL;
 	char *line = NULL;			// For getline
-	size_t line_size = 0;				// For getline
+	ST line_size = 0;				// For getline
 
 	// While loop to read in stdin and Malloc Nodes 
 	// REF - Keith Scroggs talked about using getline instead of just scanf for each line
 	while(getline(&line, &line_size, stdin) > -1) {
 		Node *n = (Node*)malloc(sizeof(Node));
-		sscanf(line, "%d %d %d %d %s", &(n->x_crd), &(n->y_crd), &(n->cur_pp), &(n->max_pp), n->name);		
+		sscanf(line, "%d %d %d %d %s", &(n->X), &(n->Y), &(n->cur_pp), &(n->max_pp), n->name);		
 
 		n->adj_size = 0;
 		n->visited = 0;
+		n->is_start = 0;
 		n->prev = last_n;			// Set Node links
 		last_n = n;
 		(*size)++;
@@ -41,24 +51,35 @@ Node* read_stdin(size_t *size) {
 
 	return last_n;;
 }
+// Allocate memory for array of Nodes
+Node** make_array(const ST size, Node **last_node) {
 
-void create_adj(Node **arr, const size_t size, const int jump_range) {
+	Node **arr = (Node**)malloc(size * sizeof(Node));
+	for(int i = size-1; i >= 0; i--) {			
+		arr[i] = *last_node;
+		*last_node = (*last_node)->prev;
+	}
+
+	return arr;
+}
+// Allocate and set every Node's adj list
+void create_adj(Node **arr, const ST size, const int jump_ran) {
 	/*	Initialize adjacency graph to keep track of connections
 			REF - https://www.techiedelight.com/initialize-2d-array-with-zeroes-c/ */
 	int matrix[size][size];
-	memset(matrix, 0, sizeof(matrix));		// set every value as 0
-	int dist_squared = jump_range * jump_range;
+	memset(matrix, 0, sizeof(matrix));					// set every value as 0
+	int dist_squared = jump_ran * jump_ran;
 
-	// Find connections with jump_range
-	for(size_t i = 0; i < size - 1; i++) {
+	for(ST i = 0; i < size - 1; i++) {			// Find connections with jump_ran
 		Node *n1 = arr[i];
-		for(size_t j = i+1; j < size; j++) {
+
+		for(ST j = i+1; j < size; j++) {
 			Node *n2 = arr[j];
-			// Calculate distance
-			int x_diff = n2->x_crd - n1->x_crd;
-			int y_diff = n2->y_crd - n1->y_crd;
+			int x_diff = n2->X - n1->X;			// Calculate distance
+			int y_diff = n2->Y - n1->Y;
 			int total = (x_diff * x_diff) + (y_diff * y_diff);
-			// Continue if jump_range is not enough	
+
+			// Continue if jump_ran is not enough	
 			if(total > dist_squared) { continue; }
 
 			// Adjust Node's adjacency size and adjacency graph
@@ -69,15 +90,15 @@ void create_adj(Node **arr, const size_t size, const int jump_range) {
 		}
 	}
 
-	
-	// Put edges into adjacency list
-	for(size_t i = 0; i < size; i++) {
-		Node *n = arr[i];												// Allocate memory for each list
+	for(ST i = 0; i < size; i++) {					// Put edges into adjacency list
+		
+		// Allocate memory for each list
+		Node *n = arr[i];
 		n->adj = (Node**)malloc(n->adj_size * sizeof(Node));
 
 		// Use matrix to connect Nodes with edges 
-		size_t index = 0;
-		for(size_t j = 0; j < size; j++) {
+		ST index = 0;
+		for(ST j = 0; j < size; j++) {
 			if(matrix[i][j] == 0) { continue; }	// 0 means no edge
 			n->adj[index] = arr[j];
 			// If adjacency list is full, then break loop
@@ -85,25 +106,57 @@ void create_adj(Node **arr, const size_t size, const int jump_range) {
 		}
 	}
 	
-
-	// /*	Print out adjacency list
-	for(size_t i = 0; i < size; i++) {
-		Node *n = arr[i];
-		printf("%s:		", n->name);
-		for(size_t j = 0; j < n->adj_size; j++) {
-			printf("%s, ", n->adj[j]->name);
-		}
-		printf("\n");
-	}
-	// */
+	// print_arr(arr, size);
 }
+// Find and check off nodes from start jump 
+void find_starting_nodes(Node **arr, const ST size, const int init_ran) {
+	int init_squared = init_ran * init_ran;
+	arr[0]->is_start = 1;
+	int x1 = arr[0]->X;
+	int y1 = arr[0]->Y;
+	
 
-// DFS somehow
+	for(ST i = 1; i < size; i++) {
+		Node *n2 = arr[i];
+		int x_diff = n2->X - x1;
+		int y_diff = n2->Y - y1;
+		int total = (x_diff * x_diff) + (y_diff * y_diff);
+		
+		if(total <= init_squared) {
+			n2->is_start = 1;
+			// printf("%s -- is strt\n",n2->name);
+		}
+	}
+
+}
+// DFS recursion call
+void dfs_rec(Node *curr, ST hop_num, Global vars) {
+
+	if(hop_num > vars.num_jumps) return;	
+	curr->visited = 1;	
+	printf("Node:%s		Hop %zu\n", curr->name, hop_num);
+
+	for(ST i = 0; i < curr->adj_size; i++) {
+		Node *index = curr->adj[i];	
+		if(0 == index->visited) {
+			dfs_rec(index, hop_num+1, vars);
+			index->visited = 0;
+		}
+	}
+}
+// Wrapper DFS call
+void DFS(Node **arr, ST size, Global vars) {
+	for(ST i = 0; i < size; i++) {
+		Node *n = arr[i];
+		if(n->is_start) {	dfs_rec(n, 1, vars);}
+	}
+
+}
 
 int main(int argc, char **argv) {
 	// Error check argv values
 	if(argc != 6) {
-		printf("usage: ./bin/chain_heal initial_range jump_range num_jumps ");
+		printf("usage: ./bin/chain_heal initial_range jump_ran num_jumps ");
 		printf("initial_power power_reduction < input_file\n");
 		return 1;
 	}	
@@ -122,25 +175,19 @@ int main(int argc, char **argv) {
 	sscanf(argv[5], "%lf", &power_red);	
 
 	
-	// Keep count of Nodes
-	size_t arr_size = 0;
-	// previous Node for chaining Nodes
-	Node *last_n = read_stdin(&arr_size);
-	// printf("ln: %s		ln->p: %s\n", last_n->name, last_n->prev->name);
+	ST size = 0;															// Keep count of Nodes
+	Node *last_n = read_stdin(&size);					// previous Node for chaining Nodes
+	Node **arr = make_array(size, &last_n);		// Malloc Node array and put Nodes in them
 
-	// Malloc Node array and put Nodes in them
-	Node **arr_nodes = (Node**)malloc(arr_size * sizeof(Node));
-	for(int i = arr_size-1; i >= 0; i--) {			
-		arr_nodes[i] = last_n;
-		last_n = last_n->prev;
-	}
-
-	// print_arr(arr_nodes, arr_size);
-
-	// TODO - Make Graph
-	create_adj(arr_nodes, arr_size, jump_ran);
+	create_adj(arr, size, jump_ran);					// Create adjacency list
+	find_starting_nodes(arr, size, init_ran); // Find and check starting nodes
+	Global vars = {num_jumps, power_red}; 		// Store global variables in a struct
+	DFS(arr, size, vars);											// Initial call for DFS
 
 	// Deleting all Nodes
-	for(size_t i = 0; i < arr_size; i++) {	free(arr_nodes[i]); }
-	free(arr_nodes);
+	for(ST i = 0; i < size; i++) {	
+		free(arr[i]->adj);
+		free(arr[i]); 
+	}
+	free(arr);
 }
