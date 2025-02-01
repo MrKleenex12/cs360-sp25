@@ -31,7 +31,7 @@ void print_arr(Node **arr, const ST size) {
 		Node *n = arr[i];
 		printf("%s:		", n->name);
 		for(ST j = 0; j < n->adj_size; j++) {
-			printf("%s	|	 ", n->adj[j]->name);
+			printf("%s | ", n->adj[j]->name);
 		}
 		printf("\n");
 	}
@@ -134,6 +134,11 @@ void find_start_Nodes(Node **arr, const ST size, const int init_ran) {
 	}
 
 }
+
+void reset_visited(Node **arr, const ST size) {
+	for(ST i = 0; i < size; i++) {	arr[i]->visited = 0; }
+}
+
 // Caclulate healing on current Node
 int calc_healing(Node **current, const int hop_num, CL *cl) {
 	Node *curr = *current;
@@ -156,9 +161,9 @@ void dfs_rec(Node *curr, const int hop_num, int healing, CL *cl, Global **vars) 
 	curr->visited = 1;											// Set current Node as visited
 	// Caclulate Healing
 	healing += calc_healing(&curr, hop_num, cl);
-	if(healing > dv->best_heal) {
+	if(healing >= dv->best_heal) {
 		dv->best_heal = healing;
-		// printf("\nNew Best Healing: %d\n\n", healing);
+		// printf("\nNew Best Healing: %d\n", healing);
 
 		Node *index = curr;
 		for(int i = hop_num-1; i >= 0; i--) {
@@ -184,8 +189,10 @@ void DFS(Node **arr, ST size, CL *cl, Global **vars) {
 	for(ST i = 0; i < size; i++) {
 		Node *n = arr[i];
 		if(0 == n->is_start ) {	continue; }
-		
+		// printf("%s\n", n->name);
 		dfs_rec(n, 1, 0, cl, vars);
+		reset_visited(arr, size);
+
 	}
 }
 
@@ -218,12 +225,12 @@ int main(int argc, char **argv) {
 	
 	vars->path_arr = (int*)malloc(cl->jumps * sizeof(int));
 	vars->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
-	for(ST i = 0; i < size; i++) {
-		if(0 == arr[i]->is_start) {	continue;	}
+	// printf("%s\n", arr[7]->name);
+	DFS(arr, size, cl, &vars);
+	printf("\n");
 
-		DFS(arr, size, cl, &vars);
-	}
-
+	// print_arr(arr, size);
+	
 	for(int i = 0; i < cl->jumps; i++) {
 		int index = vars->path_arr[i];
 		printf("%s %d\n", arr[index]->name, vars->heal_arr[i]);
