@@ -230,6 +230,8 @@ int main(int argc, char **argv) {
 	// Freeing memory
 	free(vars->heal_arr);
 	free(vars->path_arr);
+	free(vars);
+	free(cl);
 	for(ST i = 0; i < size; i++) {	
 		free(arr[i]->adj);
 		free(arr[i]); 
