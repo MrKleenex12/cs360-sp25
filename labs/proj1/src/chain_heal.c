@@ -8,7 +8,7 @@ typedef size_t ST;
 
 typedef struct Node {
 	char name[101], is_start, visited;
-	int X, Y, cur_pp, max_pp;
+	int X, Y, cur_pp, max_pp, max_heal;
 	ST adj_size;
 	struct Node *prev, **adj;
 } Node;
@@ -17,7 +17,7 @@ typedef struct Node {
 typedef struct Global {
 	int jumps, init_heal, best;
 	double heal_scale;
-	Node **path;
+	Node *last;
 } Global;
 
 // ****************************** FUNCTIONS ****************************** 
@@ -117,25 +117,23 @@ void find_start_Nodes(Node **arr, const ST size, const int init_ran) {
 	int x1 = arr[0]->X;
 	int y1 = arr[0]->Y;
 	
-
+	// Set n2 as start node if within initial range
 	for(ST i = 1; i < size; i++) {
 		Node *n2 = arr[i];
 		int x_diff = n2->X - x1;
 		int y_diff = n2->Y - y1;
 		int total = (x_diff * x_diff) + (y_diff * y_diff);
 		
-		if(total <= init_squared) {
-			n2->is_start = 1;
-			// printf("%s -- is strt\n",n2->name);
-		}
+		if(total <= init_squared) {		n2->is_start = 1;		}
 	}
 
 }
 // Caclulate healing on current Node
 int calc_healing(Node *curr, const int hop_num, Global *v) {
 	int h = rint( (double) v->init_heal * pow(v->heal_scale, hop_num-1));
-	int max = curr->max_pp - curr->cur_pp;
-	if(h > max) {		h = max;		}
+	curr->max_heal = curr->max_pp - curr->cur_pp;
+	if(h > curr->max_heal) {		h = curr->max_heal;		}
+	else {curr->max_heal = h; }
 	return h;
 }
 
@@ -144,18 +142,24 @@ void dfs_rec(Node *curr, const int hop_num, int healing, Global **vars) {
 	// BASE CASE - MAX JUMPS
 	if(hop_num > v->jumps) { return;	}
 
-	curr->visited = 1;	
+	curr->visited = 1;											// Set current Node as visited
+	// Caclulate Healing
 	healing += calc_healing(curr, hop_num, *vars);
+	if(healing > v->best) {
+		(*vars)->best = healing;
+		// Update last Node of longest healing
+		(*vars)->last = curr;
+	}
 	// Index through neighbors of curr Node and call dfs_rec
 	for(ST i = 0; i < curr->adj_size; i++) {
 		Node *index = curr->adj[i];	
-		if(1 == index->visited) { continue; }	// Only check for unvisited neighbors
+		// Only check for unvisited neighbors
+		if(1 == index->visited) { continue; }
+
+		index->prev = curr;
 		dfs_rec(index, hop_num+1, healing, vars);
 		index->visited = 0;										// Set as unvisited when backtracking
 	}
-
-	// Update best healing if needed
-	if(healing > v->best) {(*vars)->best = healing;}
 }
 
 void DFS(Node **arr, ST size, Global *vars) {
@@ -166,7 +170,7 @@ void DFS(Node **arr, ST size, Global *vars) {
 		dfs_rec(n, 1, 0, &vars);
 	}
 
-	printf("Total Healing: %d\n", vars->best);
+	printf("Total Healing: %d\n\n", vars->best);
 }
 
 // ****************************** MAIN ******************************
@@ -192,11 +196,17 @@ int main(int argc, char **argv) {
 	ST size = 0;															// Node counter
 	Node *last_n = read_stdin(&size);					// Last Node in the list 
 	Node **arr = make_array(size, &last_n);		// Allocate and fill Node array
-	make_adj_lists(arr, size, jump_ran);					// Allocate memory & make adjacency list;
+	make_adj_lists(arr, size, jump_ran);			// Allocate memory & make adjacency list;
 	find_start_Nodes(arr, size, init_ran); 		// Starting Nodes will be checked off 
 	// Store global variables in a struct
 	Global vars = {num_jumps, init_power,0, 1.0-power_red, NULL};
 	DFS(arr, size, &vars);											// Initial call for DFS
+
+	Node *index = vars.last;
+	for(ST i = 0; i < (ST)num_jumps; i++) {
+		printf("%s - %d\n", index->name, index->max_heal);
+		index = index->prev;
+	}
 
 	// Deleting Nodes and other memory
 	for(ST i = 0; i < size; i++) {	
