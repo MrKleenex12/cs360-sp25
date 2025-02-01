@@ -169,8 +169,6 @@ void DFS(Node **arr, ST size, Global *vars) {
 		
 		dfs_rec(n, 1, 0, &vars);
 	}
-
-	printf("Total Healing: %d\n\n", vars->best);
 }
 
 // ****************************** MAIN ******************************
@@ -203,10 +201,18 @@ int main(int argc, char **argv) {
 	DFS(arr, size, &vars);											// Initial call for DFS
 
 	Node *index = vars.last;
-	for(ST i = 0; i < (ST)num_jumps; i++) {
-		printf("%s - %d\n", index->name, index->max_heal);
+	Node **tmp_arr = (Node**)malloc(num_jumps * sizeof(Node));
+	for(int i = num_jumps-1; i >= 0; i--) {
+		tmp_arr[i] = index;
 		index = index->prev;
 	}
+
+	// OUTPUT
+	for(ST i = 0; i < (ST)num_jumps; i++) {
+		printf("%s %d\n", tmp_arr[i]->name,tmp_arr[i]->max_heal);
+	}
+	free(tmp_arr);
+	printf("Total Healing %d\n", vars.best);
 
 	// Deleting Nodes and other memory
 	for(ST i = 0; i < size; i++) {	
