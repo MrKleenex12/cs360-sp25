@@ -181,10 +181,6 @@ void dfs_rec(Node *curr, const int hop_num, int healing, CL *cl, Global **vars) 
 }
 
 void DFS(Node **arr, ST size, CL *cl, Global **vars) {
-	Global *dv = *vars;
-	dv->path_arr = (int*)malloc(cl->jumps * sizeof(int));
-	dv->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
-
 	for(ST i = 0; i < size; i++) {
 		Node *n = arr[i];
 		if(0 == n->is_start ) {	continue; }
@@ -219,7 +215,14 @@ int main(int argc, char **argv) {
 	make_adj_lists(arr, size, cl->jump_ran);			// Allocate memory & make adjacency list;
 	find_start_Nodes(arr, size, cl->init_ran); 		// Starting Nodes will be checked off 
 	Global *vars = (Global*)malloc(sizeof(Global));
-	DFS(arr, size, cl, &vars);											// Initial call for DFS
+	
+	vars->path_arr = (int*)malloc(cl->jumps * sizeof(int));
+	vars->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
+	for(ST i = 0; i < size; i++) {
+		if(0 == arr[i]->is_start) {	continue;	}
+
+		DFS(arr, size, cl, &vars);
+	}
 
 	for(int i = 0; i < cl->jumps; i++) {
 		int index = vars->path_arr[i];
