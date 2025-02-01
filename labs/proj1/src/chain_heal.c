@@ -212,7 +212,7 @@ int main(int argc, char **argv) {
 		printf("%s %d\n", tmp_arr[i]->name,tmp_arr[i]->max_heal);
 	}
 	free(tmp_arr);
-	printf("Total Healing %d\n", vars.best);
+	printf("Total_Healing %d\n", vars.best);
 
 	// Deleting Nodes and other memory
 	for(ST i = 0; i < size; i++) {	
