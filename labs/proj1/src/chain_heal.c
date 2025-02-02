@@ -50,8 +50,6 @@ Node* read_stdin(ST *size) {
 
 		// Set Node default Values;
 		n->adj_size = 0;
-		n->visited = 0;
-		n->is_start = 0;
 		n->prev = last_n;	
 		last_n = n;
 		(*size)++;
@@ -80,7 +78,7 @@ void make_adj_lists(Node **arr, const ST size, const int jump_ran) {
 			REF - https://www.techiedelight.com/initialize-2d-array-with-zeroes-c/ */
 	int matrix[size][size];
 	memset(matrix, 0, sizeof(matrix));			// set every value as 0
-	int dist_squared = jump_ran * jump_ran;
+	
 
 	// FIRST - Find connections with jump_ran
 	for(ST i = 0; i < size - 1; i++) {
@@ -88,7 +86,7 @@ void make_adj_lists(Node **arr, const ST size, const int jump_ran) {
 		for(ST j = i+1; j < size; j++) {
 			Node *n2 = arr[j];
 			// Continue if jump_ran is not enough	
-			if( find_dist(n1, n2) > dist_squared) { continue; }
+			if( find_dist(n1, n2) > jump_ran * jump_ran) { continue; }
 			// Adjust Node's adjacency size and adjacency graph
 			n1->adj_size++;
 			n2->adj_size++;
@@ -115,13 +113,13 @@ void make_adj_lists(Node **arr, const ST size, const int jump_ran) {
 }
 
 void find_start_Nodes(Node **arr, const ST size, const int init_ran) {
-	int init_squared = init_ran * init_ran;
+	
 	arr[0]->is_start = 1;
 	
 	// Set n2 as start node if within initial range
 	for(ST i = 1; i < size; i++) {
 		Node *n2 = arr[i];
-		if( find_dist(arr[0], n2) <= init_squared ) {		n2->is_start = 1;		}
+		if( find_dist(arr[0], n2) <= init_ran * init_ran ) {		n2->is_start = 1;		}
 	}
 
 }
@@ -189,6 +187,25 @@ void DFS(Node **arr, ST size, CLV *cl, BPV **vars) {
 	}
 }
 
+void free_memory(BPV *v, CLV *c, Node **arr, const ST size) {
+	free(v->heal_arr);
+	free(v->path_arr);
+	free(v);
+	free(c);
+	for(ST i = 0; i < size; i++) {	
+		free(arr[i]->adj);
+		free(arr[i]); 
+	}
+	free(arr);
+}
+
+void final_output(BPV *v) {
+	for(int i = 0; i < v->length; i++) {
+		printf("%s %d\n", v->path_arr[i]->name, v->heal_arr[i]);
+	}
+	printf("Total_Healing %d\n", v->best_heal);
+}
+
 // ****************************** MAIN ******************************
 int main(int argc, char **argv) {
 	// Return Error if inccorect usage 
@@ -211,27 +228,14 @@ int main(int argc, char **argv) {
 	ST size = 0;																	// Node counter
 	Node *last_n = read_stdin(&size);							// Last Node in the list 
 	Node **arr = make_array(size, &last_n);				// Allocate and fill Node array
-
+	// Make Graph
 	make_adj_lists(arr, size, cl->jump_ran);			// Allocate memory & make adjacency list;
 	find_start_Nodes(arr, size, cl->init_ran); 		// Starting Nodes will be checked off 
-
+	// DFS
 	BPV *vars = (BPV*)malloc(sizeof(BPV));
 	DFS(arr, size, cl, &vars);
 
-	// Output	
-	for(int i = 0; i < vars->length; i++) {
-		printf("%s %d\n", vars->path_arr[i]->name, vars->heal_arr[i]);
-	}
-	printf("Total_Healing %d\n", vars->best_heal);
-
-	// Freeing memory
-	free(vars->heal_arr);
-	free(vars->path_arr);
-	free(vars);
-	free(cl);
-	for(ST i = 0; i < size; i++) {	
-		free(arr[i]->adj);
-		free(arr[i]); 
-	}
-	free(arr);
+	// FINAL STEP
+	final_output(vars);														// Output	
+	free_memory(vars, cl, arr, size);							// Freeing memory
 }
