@@ -18,12 +18,12 @@ typedef struct Node {
 typedef struct Command_Line_Variables {
 	int init_ran, jump_ran, jumps, init_power;
 	double scale;
-} CL;
+} CLV;
 
-typedef struct Global_Variables {
+typedef struct Best_Path_Variables {
 	int best_heal, length, *heal_arr;
 	Node **path_arr;
-} Global;
+} BPV;
 
 // ****************************** FUNCTIONS ****************************** 
 void print_arr(Node **arr, const ST size) {
@@ -53,12 +53,11 @@ Node* read_stdin(ST *size) {
 		n->visited = 0;
 		n->is_start = 0;
 		n->prev = last_n;	
-
 		last_n = n;
 		(*size)++;
 	}
-	free(line);					// Free temporary char*
 
+	free(line);					// Free temporary char*
 	return last_n;;
 }
 
@@ -68,10 +67,14 @@ Node** make_array(const ST size, Node **last_node) {
 		arr[i] = *last_node;
 		*last_node = (*last_node)->prev;
 	}
-
 	return arr;
 }
+int find_dist(Node *n1, Node *n2) {
+	int x_diff = n2->X - n1->X;					// Calculate distance
+	int y_diff = n2->Y - n1->Y;
+	return ((x_diff * x_diff) + (y_diff * y_diff));
 
+}
 void make_adj_lists(Node **arr, const ST size, const int jump_ran) {
 	/*	Initialize adjacency graph to keep track of connections
 			REF - https://www.techiedelight.com/initialize-2d-array-with-zeroes-c/ */
@@ -84,13 +87,8 @@ void make_adj_lists(Node **arr, const ST size, const int jump_ran) {
 		Node *n1 = arr[i];
 		for(ST j = i+1; j < size; j++) {
 			Node *n2 = arr[j];
-			int x_diff = n2->X - n1->X;					// Calculate distance
-			int y_diff = n2->Y - n1->Y;
-			int total = (x_diff * x_diff) + (y_diff * y_diff);
-
 			// Continue if jump_ran is not enough	
-			if(total > dist_squared) { continue; }
-
+			if( find_dist(n1, n2) > dist_squared) { continue; }
 			// Adjust Node's adjacency size and adjacency graph
 			n1->adj_size++;
 			n2->adj_size++;
@@ -119,17 +117,11 @@ void make_adj_lists(Node **arr, const ST size, const int jump_ran) {
 void find_start_Nodes(Node **arr, const ST size, const int init_ran) {
 	int init_squared = init_ran * init_ran;
 	arr[0]->is_start = 1;
-	int x1 = arr[0]->X;
-	int y1 = arr[0]->Y;
 	
 	// Set n2 as start node if within initial range
 	for(ST i = 1; i < size; i++) {
 		Node *n2 = arr[i];
-		int x_diff = n2->X - x1;
-		int y_diff = n2->Y - y1;
-		int total = (x_diff * x_diff) + (y_diff * y_diff);
-		
-		if(total <= init_squared) {		n2->is_start = 1;		}
+		if( find_dist(arr[0], n2) <= init_squared ) {		n2->is_start = 1;		}
 	}
 
 }
@@ -139,30 +131,30 @@ void reset_visited(Node **arr, const ST size) {
 }
 
 // Caclulate healing on current Node
-int calc_healing(Node **current, const int hop_num, CL *cl) {
+int calc_healing(Node **current, const int hop_num, CLV *cl) {
 	Node *curr = *current;
 	int h = rint( (double) cl->init_power * pow(cl->scale, hop_num-1));
 	curr->max_heal = curr->max_pp - curr->cur_pp;
-	if(h > curr->max_heal) {
-		h = curr->max_heal;
-	}		else {
-		curr->max_heal = h;
-	}
+
+	// Set correct max_heal
+	if(h > curr->max_heal) {	h = curr->max_heal; }
+	else { curr->max_heal = h; }
+
 	return h;
 }
 
-void dfs_rec(Node *curr, const int hop_num, int healing, CL *cl, Global **vars) {
-	Global *v = *vars;
+void dfs_rec(Node *curr, const int hop_num, int healing, CLV *cl, BPV **vars) {
+	BPV *v = *vars;
 	curr->visited = 1;											// Set current Node as visited
 	if(hop_num > cl->jumps) { return;	}			// BASE CASE - MAX JUMPS
 
 	// Caclulate Healing
 	healing += calc_healing(&curr, hop_num, cl);
+
 	if(healing >= v->best_heal) {
-		// Update Global variables
+		// Update BPV variables
 		v->best_heal = healing;
 		v->length = hop_num;
-
 		// Set new best path
 		Node *index = curr;
 		for(int i = hop_num-1; i >= 0; i--) {
@@ -176,24 +168,21 @@ void dfs_rec(Node *curr, const int hop_num, int healing, CL *cl, Global **vars) 
 	for(ST i = 0; i < curr->adj_size; i++) {
 		Node *index = curr->adj[i];	
 		if(1 == index->visited) { continue; }	// Only check for unvisited neighbors
-
 		index->prev = curr;
-		// printf("	%s %d -> %s\n", curr->name, hop_num, index->name);
 		dfs_rec(index, hop_num+1, healing, cl, vars);
 		index->visited = 0;										// Set as unvisited when backtracking
 	}
 }
 
-void DFS(Node **arr, ST size, CL *cl, Global **vars) {
+void DFS(Node **arr, ST size, CLV *cl, BPV **vars) {
 	// Allocate array for Best path
-	Global *v = *vars;
+	BPV *v = *vars;
 	v->path_arr = (Node**)malloc(cl->jumps * sizeof(Node));
 	v->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
 
 	for(ST i = 0; i < size; i++) {
 		Node *n = arr[i];
 		if(0 == n->is_start ) {	continue; }
-
 		// Call DFS and reset for next call
 		dfs_rec(n, 1, 0, cl, vars);
 		reset_visited(arr, size);
@@ -211,7 +200,7 @@ int main(int argc, char **argv) {
 
 	/*  Store argv values with sscanf
 			REF - https://utk.instructure.com/courses/218225/pages/strings-in-c?module_item_id=5126893 */
-	CL *cl = (CL*)malloc(sizeof(CL));							// Store global variables in a struct
+	CLV *cl = (CLV*)malloc(sizeof(CLV));							// Store BPV variables in a struct
 	sscanf(argv[1], "%d", &(cl->init_ran));	
 	sscanf(argv[2], "%d", &(cl->jump_ran));	
 	sscanf(argv[3], "%d", &(cl->jumps));	
@@ -222,10 +211,11 @@ int main(int argc, char **argv) {
 	ST size = 0;																	// Node counter
 	Node *last_n = read_stdin(&size);							// Last Node in the list 
 	Node **arr = make_array(size, &last_n);				// Allocate and fill Node array
+
 	make_adj_lists(arr, size, cl->jump_ran);			// Allocate memory & make adjacency list;
 	find_start_Nodes(arr, size, cl->init_ran); 		// Starting Nodes will be checked off 
-	Global *vars = (Global*)malloc(sizeof(Global));
-	
+
+	BPV *vars = (BPV*)malloc(sizeof(BPV));
 	DFS(arr, size, cl, &vars);
 
 	// Output	
