@@ -50,6 +50,8 @@ Node* read_stdin(ST *size) {
 
 		// Set Node default Values;
 		n->adj_size = 0;
+		n->is_start = 0;
+		n->visited = 0;
 		n->prev = last_n;	
 		last_n = n;
 		(*size)++;
