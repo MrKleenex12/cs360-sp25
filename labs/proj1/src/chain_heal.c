@@ -227,7 +227,6 @@ int main(int argc, char **argv) {
 	vars->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
 	// printf("%s\n", arr[7]->name);
 	DFS(arr, size, cl, &vars);
-	printf("\n");
 
 	// print_arr(arr, size);
 	
