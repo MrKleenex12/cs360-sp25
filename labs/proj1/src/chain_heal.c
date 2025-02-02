@@ -8,7 +8,6 @@ typedef size_t ST;
 
 typedef struct Node {
 	char name[101], is_start, visited;
-	int id;
 	int X, Y, cur_pp, max_pp, max_heal;
 	ST adj_size;
 	struct Node *prev, **adj;
@@ -22,7 +21,8 @@ typedef struct Command_Line_Variables {
 } CL;
 
 typedef struct Global_Variables {
-	int best_heal, *heal_arr, *path_arr;
+	int best_heal, length, *heal_arr;
+	Node **path_arr;
 } Global;
 
 // ****************************** FUNCTIONS ****************************** 
@@ -66,7 +66,6 @@ Node** make_array(const ST size, Node **last_node) {
 	Node **arr = (Node**)malloc(size * sizeof(Node));
 	for(int i = size-1; i >= 0; i--) {			
 		arr[i] = *last_node;
-		(*last_node)->id = i;
 		*last_node = (*last_node)->prev;
 	}
 
@@ -153,30 +152,30 @@ int calc_healing(Node **current, const int hop_num, CL *cl) {
 }
 
 void dfs_rec(Node *curr, const int hop_num, int healing, CL *cl, Global **vars) {
-	Global *dv = *vars;
-	// BASE CASE - MAX JUMPS
-	if(hop_num > cl->jumps) { return;	}
-	// printf("%s(%d) - Hop: %d\n", curr->name, curr->id, hop_num);
-
+	Global *v = *vars;
 	curr->visited = 1;											// Set current Node as visited
+	if(hop_num > cl->jumps) { return;	}			// BASE CASE - MAX JUMPS
+
 	// Caclulate Healing
 	healing += calc_healing(&curr, hop_num, cl);
-	if(healing >= dv->best_heal) {
-		dv->best_heal = healing;
-		// printf("\nNew Best Healing: %d\n", healing);
+	if(healing >= v->best_heal) {
+		// Update Global variables
+		v->best_heal = healing;
+		v->length = hop_num;
 
+		// Set new best path
 		Node *index = curr;
 		for(int i = hop_num-1; i >= 0; i--) {
-			dv->path_arr[i] = index->id;
-			dv->heal_arr[i] = index->max_heal;
+			v->path_arr[i] = index;
+			v->heal_arr[i] = index->max_heal;
 			index = index->prev;
 		}
 	}
-	// Index through neighbors of curr Node and call dfs_rec
+
+	// Index through adjcency list 
 	for(ST i = 0; i < curr->adj_size; i++) {
 		Node *index = curr->adj[i];	
-		// Only check for unvisited neighbors
-		if(1 == index->visited) { continue; }
+		if(1 == index->visited) { continue; }	// Only check for unvisited neighbors
 
 		index->prev = curr;
 		// printf("	%s %d -> %s\n", curr->name, hop_num, index->name);
@@ -186,13 +185,18 @@ void dfs_rec(Node *curr, const int hop_num, int healing, CL *cl, Global **vars) 
 }
 
 void DFS(Node **arr, ST size, CL *cl, Global **vars) {
+	// Allocate array for Best path
+	Global *v = *vars;
+	v->path_arr = (Node**)malloc(cl->jumps * sizeof(Node));
+	v->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
+
 	for(ST i = 0; i < size; i++) {
 		Node *n = arr[i];
 		if(0 == n->is_start ) {	continue; }
-		// printf("%s\n", n->name);
+
+		// Call DFS and reset for next call
 		dfs_rec(n, 1, 0, cl, vars);
 		reset_visited(arr, size);
-
 	}
 }
 
@@ -207,8 +211,7 @@ int main(int argc, char **argv) {
 
 	/*  Store argv values with sscanf
 			REF - https://utk.instructure.com/courses/218225/pages/strings-in-c?module_item_id=5126893 */
-	// Store global variables in a struct
-	CL *cl = (CL*)malloc(sizeof(CL));
+	CL *cl = (CL*)malloc(sizeof(CL));							// Store global variables in a struct
 	sscanf(argv[1], "%d", &(cl->init_ran));	
 	sscanf(argv[2], "%d", &(cl->jump_ran));	
 	sscanf(argv[3], "%d", &(cl->jumps));	
@@ -216,23 +219,18 @@ int main(int argc, char **argv) {
 	sscanf(argv[5], "%lf", &(cl->scale));	
 	cl->scale = 1.0 - cl->scale;
 	
-	ST size = 0;															// Node counter
-	Node *last_n = read_stdin(&size);					// Last Node in the list 
-	Node **arr = make_array(size, &last_n);		// Allocate and fill Node array
+	ST size = 0;																	// Node counter
+	Node *last_n = read_stdin(&size);							// Last Node in the list 
+	Node **arr = make_array(size, &last_n);				// Allocate and fill Node array
 	make_adj_lists(arr, size, cl->jump_ran);			// Allocate memory & make adjacency list;
 	find_start_Nodes(arr, size, cl->init_ran); 		// Starting Nodes will be checked off 
 	Global *vars = (Global*)malloc(sizeof(Global));
 	
-	vars->path_arr = (int*)malloc(cl->jumps * sizeof(int));
-	vars->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
-	// printf("%s\n", arr[7]->name);
 	DFS(arr, size, cl, &vars);
 
-	// print_arr(arr, size);
-	
-	for(int i = 0; i < cl->jumps; i++) {
-		int index = vars->path_arr[i];
-		printf("%s %d\n", arr[index]->name, vars->heal_arr[i]);
+	// Output	
+	for(int i = 0; i < vars->length; i++) {
+		printf("%s %d\n", vars->path_arr[i]->name, vars->heal_arr[i]);
 	}
 	printf("Total_Healing %d\n", vars->best_heal);
 
