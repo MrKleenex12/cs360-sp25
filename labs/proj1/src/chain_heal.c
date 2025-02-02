@@ -9,6 +9,7 @@ typedef size_t ST;
 typedef struct Node {
 	char name[101], is_start, visited;
 	int X, Y, cur_pp, max_pp, max_heal;
+	int id;
 	ST adj_size;
 	struct Node *prev, **adj;
 } Node;
@@ -21,8 +22,8 @@ typedef struct Command_Line_Variables {
 } CLV;
 
 typedef struct Best_Path_Variables {
-	int best_heal, length, *heal_arr;
-	Node **path_arr;
+	int best_heal, length, *heal_arr, *path_arr;
+	// Node **path_arr;
 } BPV;
 
 // ****************************** FUNCTIONS ****************************** 
@@ -65,6 +66,7 @@ Node** make_array(const ST size, Node **last_node) {
 	Node **arr = (Node**)malloc(size * sizeof(Node));
 	for(int i = size-1; i >= 0; i--) {			
 		arr[i] = *last_node;
+		arr[i]->id = i;
 		*last_node = (*last_node)->prev;
 	}
 	return arr;
@@ -158,7 +160,7 @@ void dfs_rec(Node *curr, const int hop_num, int healing, CLV *cl, BPV **vars) {
 		// Set new best path
 		Node *index = curr;
 		for(int i = hop_num-1; i >= 0; i--) {
-			v->path_arr[i] = index;
+			v->path_arr[i] = index->id;
 			v->heal_arr[i] = index->max_heal;
 			index = index->prev;
 		}
@@ -177,7 +179,7 @@ void dfs_rec(Node *curr, const int hop_num, int healing, CLV *cl, BPV **vars) {
 void DFS(Node **arr, ST size, CLV *cl, BPV **vars) {
 	// Allocate array for Best path
 	BPV *v = *vars;
-	v->path_arr = (Node**)malloc(cl->jumps * sizeof(Node));
+	v->path_arr = (int*)malloc(cl->jumps * sizeof(int));
 	v->heal_arr = (int*)malloc(cl->jumps * sizeof(int));
 
 	for(ST i = 0; i < size; i++) {
@@ -201,9 +203,9 @@ void free_memory(BPV *v, CLV *c, Node **arr, const ST size) {
 	free(arr);
 }
 
-void final_output(BPV *v) {
+void final_output(BPV *v, Node **arr) {
 	for(int i = 0; i < v->length; i++) {
-		printf("%s %d\n", v->path_arr[i]->name, v->heal_arr[i]);
+		printf("%s %d\n", arr[v->path_arr[i]]->name, v->heal_arr[i]);
 	}
 	printf("Total_Healing %d\n", v->best_heal);
 }
@@ -238,6 +240,6 @@ int main(int argc, char **argv) {
 	DFS(arr, size, cl, &vars);
 
 	// FINAL STEP
-	final_output(vars);														// Output	
+	final_output(vars, arr);														// Output	
 	free_memory(vars, cl, arr, size);							// Freeing memory
 }
