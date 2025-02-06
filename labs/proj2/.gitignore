@@ -1,0 +1,6 @@
+lib/*
+bin/*
+obj/*
+!lib/.keep
+!obj/.keep
+!bin/.keep
