@@ -1,7 +1,9 @@
 lib/*
 bin/*
 obj/*
+data/*
 !lib/.keep
 !obj/.keep
 !bin/.keep
+!data/.keep
 .vscode
