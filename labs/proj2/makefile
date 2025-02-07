@@ -1,6 +1,6 @@
 CC = gcc 
-INCLUDES = -I ~/VScode/school/cs360-sp25/include
-CFLAGS = $(INCLUDES)
+INCLUDES = -I ~/VScode/school/cs360-sp25/include 
+CFLAGS = $(INCLUDES) -fsanitize=address,undefined
 LIBDIR = ~/VScode/school/cs360-sp25/lib
 LIBS = $(LIBDIR)/libfdr.a 
 
