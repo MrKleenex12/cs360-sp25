@@ -1,5 +1,5 @@
 CC = gcc 
-INCLUDES = -I~/VScode/school/cs360-sp25/include
+INCLUDES = -I ~/VScode/school/cs360-sp25/include
 CFLAGS = $(INCLUDES)
 LIBDIR = ~/VScode/school/cs360-sp25/lib
 LIBS = $(LIBDIR)/libfdr.a 
