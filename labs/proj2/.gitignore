@@ -4,3 +4,4 @@ obj/*
 !lib/.keep
 !obj/.keep
 !bin/.keep
+.vscode
