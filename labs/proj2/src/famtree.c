@@ -9,7 +9,10 @@
 typedef struct person {
   char *name, sex;
   struct person *dad, *mom;
+  int nkids;
+  Dllist kid_list;
 } Person;
+
 
 char* full_name(IS is) {
   int nf = is->NF;
@@ -28,7 +31,7 @@ char* full_name(IS is) {
     strcpy(name+ssize+1, is->fields[i]);
     ssize += strlen(name+ssize);
   }
-
+  
   return name;
 }
 
@@ -49,20 +52,24 @@ Person* create_person(char* name, JRB *tree) {
   p->mom = NULL;
   p->sex = 'U';
   jrb_insert_str(*tree, name, new_jval_v((void*) p));
+  p->kid_list = new_dllist();
 
   return p;
 }
 
 void free_person(Person *p) {
   if(p->name != NULL) { free(p->name); }
-  if(p->dad != NULL) { free(p->dad); }
-  if(p->mom != NULL) { free(p->mom); }
+  free_dllist(p->kid_list);
   if(p != NULL) { free(p); }
 }
 
 void add_parent(Person* p1, Person* p2, const char c) {
   if(c == 'M') { p1->dad = p2; }
   else {p1->mom = p2;}
+}
+
+void add_kid(Person* p1, Person* p2) {
+  dll_append(p1->kid_list, new_jval_v((void*) p2));
 }
 
 int read_file(const char* filename, JRB *tree) {
@@ -73,12 +80,13 @@ int read_file(const char* filename, JRB *tree) {
   /* Parse through file with while loop*/
   while(get_line(is) >= 0) { 
     char *name = (is->NF > 2) ? full_name(is) : one_name(is);
+    /* Update p1 if needed*/
     if(strcmp(is->fields[0], "PERSON") == 0) {
       p1 = create_person(name, tree);
       continue;
     }
 
-    // Get Person if real name 
+    // Update p2 if not SEX line
     if(strcmp(is->fields[0], "SEX") != 0) { p2 = create_person(name, tree); }
 
     /* Relational Links*/
@@ -89,13 +97,14 @@ int read_file(const char* filename, JRB *tree) {
       add_parent(p1, p2, 'F');
     }
     else if(strcmp(is->fields[0], "FATHER_OF") == 0) {
+      add_kid(p1, p2);
     }
     else if(strcmp(is->fields[0], "MOTHER_OF") == 0) {
+      add_kid(p1, p2);
     }
     else if(strcmp(is->fields[0], "SEX") == 0) {
       p1->sex = *(is->fields[1]);
     }
-    /* Read in PERSON'S details */
   }
 
   jettison_inputstruct(is);
