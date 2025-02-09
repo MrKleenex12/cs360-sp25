@@ -8,3 +8,4 @@ data/*
 !data/.keep
 .vscode
 testing
+makefile
