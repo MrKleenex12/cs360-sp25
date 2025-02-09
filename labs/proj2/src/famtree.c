@@ -44,7 +44,10 @@ char* one_name(IS is) {
 Person* create_person(char* name, JRB *tree) {
   /* Check if already created in tree*/
   JRB found = jrb_find_str(*tree, name);
-  if(found != NULL) { return (Person*)found->val.v; } 
+  if(found != NULL) {
+    free(name);
+    return (Person*)found->val.v;
+  } 
 
   Person* p = (Person*)malloc(sizeof(Person));
   p->name = name;
@@ -58,9 +61,9 @@ Person* create_person(char* name, JRB *tree) {
 }
 
 void free_person(Person *p) {
-  if(p->name != NULL) { free(p->name); }
+  free(p->name);
   free_dllist(p->kid_list);
-  if(p != NULL) { free(p); }
+  free(p);
 }
 
 void add_parent(Person* p1, Person* p2, const char c) {
