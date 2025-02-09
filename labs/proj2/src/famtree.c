@@ -54,8 +54,8 @@ Person* create_person(char* name, JRB *tree) {
   p->dad = NULL;
   p->mom = NULL;
   p->sex = 'U';
-  jrb_insert_str(*tree, name, new_jval_v((void*) p));
   p->kid_list = new_dllist();
+  jrb_insert_str(*tree, name, new_jval_v((void*) p));
 
   return p;
 }
@@ -82,9 +82,10 @@ int read_file(const char* filename, JRB *tree) {
 
   /* Parse through file with while loop*/
   while(get_line(is) >= 0) { 
+    if(is->NF == 0) { continue; }                 /* Skip blank lines */
     char *name = (is->NF > 2) ? full_name(is) : one_name(is);
-    /* Update p1 if needed*/
-    if(strcmp(is->fields[0], "PERSON") == 0) {
+
+    if(strcmp(is->fields[0], "PERSON") == 0) {    /* Update p1 if needed*/
       p1 = create_person(name, tree);
       continue;
     }
