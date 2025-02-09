@@ -5,16 +5,10 @@
 #include "fields.h"
 #include "jrb.h"
 
-/*  Make Person struct
-    name
-    Sex
-    Father
-    Mother
-    List of children
-*/
 
 typedef struct person {
-  char *name, *dad, *mom, sex;
+  char *name, sex;
+  struct person *dad, *mom;
 } Person;
 
 char* full_name(IS is) {
@@ -44,25 +38,65 @@ char* one_name(IS is) {
   return name;
 }
 
-int read_file(const char* filename) {
+Person* create_person(char* name, JRB *tree) {
+  /* Check if already created in tree*/
+  JRB found = jrb_find_str(*tree, name);
+  if(found != NULL) { return (Person*)found->val.v; } 
+
+  Person* p = (Person*)malloc(sizeof(Person));
+  p->name = name;
+  p->dad = NULL;
+  p->mom = NULL;
+  p->sex = 'U';
+  jrb_insert_str(*tree, name, new_jval_v((void*) p));
+
+  return p;
+}
+
+void free_person(Person *p) {
+  if(p->name != NULL) { free(p->name); }
+  if(p->dad != NULL) { free(p->dad); }
+  if(p->mom != NULL) { free(p->mom); }
+  if(p != NULL) { free(p); }
+}
+
+void add_parent(Person* p1, Person* p2, const char c) {
+  if(c == 'M') { p1->dad = p2; }
+  else {p1->mom = p2;}
+}
+
+int read_file(const char* filename, JRB *tree) {
   IS is = new_inputstruct(filename);
-  if(NULL == is) {  return 1; }       /* Quit if reading argv went wrong */
+  if(NULL == is) {  return 1; }                   /* Quit if reading argv went wrong */
+  Person *p1, *p2;
 
-  /* Parse through file */
-  int count = 0;
-  while(get_line(is) >= 0) {
-    if(strcmp(is->fields[0], "PERSON") == 0) { 
-      // Create Person with just name like in /testing
-      Person *p = (Person*)malloc(sizeof(Person));
-
-      p->name = (is->NF > 2) ? full_name(is) : one_name(is);
-
-      free(p->name);
-      free(p);
-      count++; 
+  /* Parse through file with while loop*/
+  while(get_line(is) >= 0) { 
+    char *name = (is->NF > 2) ? full_name(is) : one_name(is);
+    if(strcmp(is->fields[0], "PERSON") == 0) {
+      p1 = create_person(name, tree);
+      continue;
     }
+
+    // Get Person if real name 
+    if(strcmp(is->fields[0], "SEX") != 0) { p2 = create_person(name, tree); }
+
+    /* Relational Links*/
+    if(strcmp(is->fields[0], "FATHER") == 0) {
+      add_parent(p1, p2, 'M');
+    }
+    else if(strcmp(is->fields[0], "MOTHER") == 0) {
+      add_parent(p1, p2, 'F');
+    }
+    else if(strcmp(is->fields[0], "FATHER_OF") == 0) {
+    }
+    else if(strcmp(is->fields[0], "MOTHER_OF") == 0) {
+    }
+    else if(strcmp(is->fields[0], "SEX") == 0) {
+      p1->sex = *(is->fields[1]);
+    }
+    /* Read in PERSON'S details */
   }
-  printf("There are %d of People in %s\n", count, filename);
 
   jettison_inputstruct(is);
   return 0;
@@ -76,8 +110,18 @@ int main(int argc, char **argv) {
   }
 
   /* Check valid file */
-  if(1 == read_file(argv[1])) {
+  JRB tree = make_jrb();
+  if(1 == read_file(argv[1], &tree)) {
     perror(argv[1]);
     return 1; 
   };
+
+  JRB tmp;
+  jrb_traverse(tmp, tree) {
+    Person* p = (Person*) tmp->val.v;
+    printf("%s - %c\n", p->name, p->sex); 
+    free_person(p);
+  }
+
+  jrb_free_tree(tree);
 }
