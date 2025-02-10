@@ -34,11 +34,13 @@ char* full_name(IS is) {
   return name;
 }
 
+
 char* one_name(IS is) {
   char* name = (char*)malloc((strlen(is->fields[1]) + 1) * sizeof(char)); 
   strcpy(name, is->fields[1]);
   return name;
 }
+
 
 Person* create_person(char* name, JRB *tree) {
   /* Check if already created in tree*/
@@ -47,7 +49,7 @@ Person* create_person(char* name, JRB *tree) {
     free(name);
     return (Person*)found->val.v;
   } 
-
+  /* Else make person*/
   Person* p = (Person*)malloc(sizeof(Person));
   p->name = name;
   p->dad = NULL;
@@ -62,6 +64,7 @@ Person* create_person(char* name, JRB *tree) {
   return p;
 }
 
+
 void free_everything(JRB tree, JRB tmp) {
   jrb_traverse(tmp, tree) {
     Person* p = ((Person*)tmp->val.v);
@@ -73,9 +76,11 @@ void free_everything(JRB tree, JRB tmp) {
 
 }
 
+
 void print(Person* p) {
   printf("%s\n", p->name);
 
+  /* Print all details */
   char *sex = (p->sex == 'M') ? "Male" : "Female";
   if(p->sex != 'U') { printf("  Sex: %s\n", sex); }
   else { printf("  Sex: Unknown\n"); }
@@ -83,7 +88,7 @@ void print(Person* p) {
   else { printf("  Father: Unknown\n"); }
   if(p->mom != NULL) { printf("  Mother: %s\n", p->mom->name); }
   else { printf("  Mother: Unknown\n"); }
-
+  /* Print all Children */
   if(dll_empty(p->kid_list)) { printf("  Children: None\n"); }
   else {
     Dllist tmp;
@@ -95,17 +100,20 @@ void print(Person* p) {
   printf("\n");
 }
 
+
 int add_parent(Person* p1, Person* p2, const char c) {
   /* Error Check */
   if(p2->sex != c && p2->sex != 'U') { return 2; }
   p2->sex = c;
 
   if(c == 'M') {    /* Father */
+    /* Error Check */
     if(p1->dad != NULL) { return 1; }
     p1->dad = p2; 
     dll_append(p2->kid_list, new_jval_v((void*) p1));
   }
   else {            /* Mother */
+    /* Error Check */
     if(p1->mom != NULL) { return 1; }
     p1->mom = p2; 
     dll_append(p2->kid_list, new_jval_v((void*) p1));
@@ -113,6 +121,7 @@ int add_parent(Person* p1, Person* p2, const char c) {
   
   return 0;
 }
+
 
 int add_kid(Person* p1, Person* p2, const char c) {
   /* Error Check */
@@ -139,6 +148,7 @@ void double_parent(IS is, JRB *tree, JRB tmp, const char c) {
   exit(1);
 }
 
+
 void read_stdin(JRB *tree, JRB tmp) {
   IS is = new_inputstruct(NULL);
   Person *p1, *p2;
@@ -153,7 +163,8 @@ void read_stdin(JRB *tree, JRB tmp) {
       continue;
     }
 
-    // Update p2 if not SEX line
+
+    /* Update p2 if not SEX line */
     if(strcmp(is->fields[0], "SEX") == 0) {
       char sex = *(is->fields[1]);
       if(p1->sex != 'U' && p1->sex != sex) { sex_error(is, tree, tmp); }
@@ -162,20 +173,24 @@ void read_stdin(JRB *tree, JRB tmp) {
     } 
     else { p2 = create_person(name, tree);}
 
-    /* Relational Links*/
+
+    /* Relational Links */
     if(strcmp(is->fields[0], "FATHER") == 0) { 
       int error = add_parent(p1, p2, 'M');
       if(error == 1) { double_parent(is, tree, tmp, 'M'); }
       else if( error == 2) { sex_error(is, tree, tmp); }
     }
+
     else if(strcmp(is->fields[0], "MOTHER") == 0) {
       int error = add_parent(p1, p2, 'F');
       if(error == 1) { double_parent(is, tree, tmp, 'F'); }
       else if( error == 2) { sex_error(is, tree, tmp); }
     }
+  
     else if(strcmp(is->fields[0], "FATHER_OF") == 0) {
       add_kid(p1, p2, 'M');
     }
+
     else if(strcmp(is->fields[0], "MOTHER_OF") == 0) {
       if(add_kid(p1, p2, 'F')) { sex_error(is, tree, tmp); }
     }
@@ -204,10 +219,7 @@ void topological(JRB tree, JRB tmp, Dllist index) {
     if(p->dad != NULL) { p->dependencies++; }
     if(p->mom != NULL) { p->dependencies++; }
     /* Add to queue if 0 dependencies */
-    if(p->dependencies == 0) { 
-      dll_append(queue, new_jval_v((void*) p));
-      // printf("%s\n", p->name);
-    }
+    if(p->dependencies == 0) { dll_append(queue, new_jval_v((void*) p)); }
   }
 
   while(!dll_empty(queue)) {
@@ -241,7 +253,6 @@ int main(int argc, char **argv) {
       free_everything(tree, tmp);
       return 1;
     }
-    // print(p);
   }
   topological(tree, tmp, index);
 
