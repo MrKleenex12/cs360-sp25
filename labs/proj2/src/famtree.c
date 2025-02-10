@@ -88,13 +88,26 @@ void print(Person* p) {
 }
 
 void add_parent(Person* p1, Person* p2, const char c) {
-  if(c == 'M') { p1->dad = p2; }
-  else {p1->mom = p2;}
+  /* Father */
+  if(c == 'M') {
+    /* Error Check */
+    if(p1->dad == NULL) {
+      p1->dad = p2; 
+    }
+  }
+  /* Mother */
+  else {
+    /* Error Check */
+    if(p1->mom == NULL) {
+      p1->mom = p2; 
+    }
+  }
 }
 
 void add_kid(Person* p1, Person* p2, const char c) {
   dll_append(p1->kid_list, new_jval_v((void*) p2));
   p1->sex = c;
+  add_parent(p2, p1, c);
 }
 
 void read_stdin(JRB *tree) {
@@ -111,16 +124,17 @@ void read_stdin(JRB *tree) {
       continue;
     }
     // Update p2 if not SEX line
-    if(strcmp(is->fields[0], "SEX") != 0) { p2 = create_person(name, tree); }
+    if(strcmp(is->fields[0], "SEX") == 0) {
+      p1->sex = *(is->fields[1]);
+      free(name);
+    } 
+    else { p2 = create_person(name, tree);}
+
     /* Relational Links*/
     if(strcmp(is->fields[0], "FATHER") == 0) { add_parent(p1, p2, 'M'); }
     else if(strcmp(is->fields[0], "MOTHER") == 0) { add_parent(p1, p2, 'F'); }
     else if(strcmp(is->fields[0], "FATHER_OF") == 0) { add_kid(p1, p2, 'M'); }
     else if(strcmp(is->fields[0], "MOTHER_OF") == 0) { add_kid(p1, p2, 'F'); }
-    else if(strcmp(is->fields[0], "SEX") == 0) {
-      p1->sex = *(is->fields[1]);
-      free(name);
-    }
   }
 
   jettison_inputstruct(is);
@@ -131,9 +145,9 @@ int check_cycle(Person* p, Dllist tmp) {
   p->visited = 1;
   dll_traverse(tmp, p->kid_list) {
     Person* p = ((Person*)tmp->val.v);
-    check_cycle(p, tmp);
-    p->visited = 0;
+    if(check_cycle(p, tmp)) { return 1; }
   }
+  p->visited = 0;
 
   return 0;
 }
@@ -149,12 +163,10 @@ int main(int argc, char **argv) {
   jrb_traverse(tmp, tree) {
     Person* p = (Person*) tmp->val.v;
     print(p);
-    /*
     if(check_cycle(p, index) == 1) {
-      fprintf(stderr, "Cycle Detected\n");
+      fprintf(stderr, "Bad input-- cycle in specification\n");
       return 1;
     }
-    */
   }
 
   /* Freeing Everything*/
