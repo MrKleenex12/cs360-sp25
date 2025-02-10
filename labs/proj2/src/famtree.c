@@ -96,6 +96,8 @@ void print(Person* p) {
 }
 
 int add_parent(Person* p1, Person* p2, const char c) {
+  /* Error Check */
+  if(p2->sex != c && p2->sex != 'U') { return 2; }
   p2->sex = c;
 
   if(c == 'M') {    /* Father */
@@ -162,10 +164,14 @@ void read_stdin(JRB *tree, JRB tmp) {
 
     /* Relational Links*/
     if(strcmp(is->fields[0], "FATHER") == 0) { 
-      if(add_parent(p1, p2, 'M')) { double_parent(is, tree, tmp, 'M'); }
+      int error = add_parent(p1, p2, 'M');
+      if(error == 1) { double_parent(is, tree, tmp, 'M'); }
+      else if( error == 2) { sex_error(is, tree, tmp); }
     }
     else if(strcmp(is->fields[0], "MOTHER") == 0) {
-      if(add_parent(p1, p2, 'F')) { double_parent(is, tree, tmp, 'F'); }
+      int error = add_parent(p1, p2, 'F');
+      if(error == 1) { double_parent(is, tree, tmp, 'F'); }
+      else if( error == 2) { sex_error(is, tree, tmp); }
     }
     else if(strcmp(is->fields[0], "FATHER_OF") == 0) {
       add_kid(p1, p2, 'M');
