@@ -8,7 +8,7 @@
 
 typedef struct person {
   char *name, sex;
-  char visited, printed;
+  char visited;
   int dependencies;
   struct person *dad, *mom;
   Dllist kid_list;
@@ -105,11 +105,19 @@ int add_parent(Person* p1, Person* p2, const char c) {
   if(p2->sex != c && p2->sex != 'U') { return 2; }
   p2->sex = c;
 
-  Person* who_to_update = (c == 'M') ? p1->dad : p1->mom;
-  if(who_to_update == NULL) { return 1; }
-  who_to_update = p2;
-  dll_append(p2->kid_list, new_jval_v((void*) p1));
-
+  if(c == 'M') {    /* Father */
+    /* Error Check */
+    if(p1->dad != NULL) { return 1; }
+    p1->dad = p2; 
+    dll_append(p2->kid_list, new_jval_v((void*) p1));
+  }
+  else {            /* Mother */
+    /* Error Check */
+    if(p1->mom != NULL) { return 1; }
+    p1->mom = p2; 
+    dll_append(p2->kid_list, new_jval_v((void*) p1));
+  }
+  
   return 0;
 }
 
@@ -120,8 +128,8 @@ int add_kid(Person* p1, Person* p2, const char c) {
 
   dll_append(p1->kid_list, new_jval_v((void*) p2));
   p1->sex = c;
-  Person* who_to_update = (c == 'M') ? p2->dad : p2->mom;
-  who_to_update = p1;
+  if(c == 'M') { p2->dad = p1; } 
+  else { p2->mom = p1; }
 
   return 0;
 }
@@ -142,77 +150,64 @@ void double_parent(IS is, JRB *tree, JRB tmp, const char c) {
 
 void read_stdin(JRB *tree, JRB tmp) {
   IS is = new_inputstruct(NULL);
-  Person* p1; /* p1 is the person that the relational info is connected to */
-  Person* p2; /* p2 is the person that comes after anything like MOTHER or FATHER */
+  Person *p1, *p2;
 
   /* Parse through file with while loop*/
   while(get_line(is) >= 0) { 
     if(is->NF == 0) { continue; }                 /* Skip blank lines */
     char *name = (is->NF > 2) ? full_name(is) : one_name(is);
-
-    /* Update p1 */
+    /* Update p1 if needed*/
     if(strcmp(is->fields[0], "PERSON") == 0) {
       p1 = create_person(name, tree);
       continue;
     }
 
-    /* If SEX line, then update Sex */
+
+    /* Update p2 if not SEX line */
     if(strcmp(is->fields[0], "SEX") == 0) {
-      free(name);
       char sex = *(is->fields[1]);
       if(p1->sex != 'U' && p1->sex != sex) { sex_error(is, tree, tmp); }
       p1->sex = sex;
+      free(name);
     } 
-    /* Create p2 */
     else { p2 = create_person(name, tree);}
-    
-    /* FATHER */
+
+
+    /* Relational Links */
     if(strcmp(is->fields[0], "FATHER") == 0) { 
       int error = add_parent(p1, p2, 'M');
       if(error == 1) { double_parent(is, tree, tmp, 'M'); }
       else if( error == 2) { sex_error(is, tree, tmp); }
     }
-    /* MOTHER */
+
     else if(strcmp(is->fields[0], "MOTHER") == 0) {
       int error = add_parent(p1, p2, 'F');
       if(error == 1) { double_parent(is, tree, tmp, 'F'); }
       else if( error == 2) { sex_error(is, tree, tmp); }
     }
-    /* FATHER_OF */
+  
     else if(strcmp(is->fields[0], "FATHER_OF") == 0) {
       add_kid(p1, p2, 'M');
     }
-    /* MOTHER_OF */
+
     else if(strcmp(is->fields[0], "MOTHER_OF") == 0) {
       if(add_kid(p1, p2, 'F')) { sex_error(is, tree, tmp); }
     }
   }
 
-  jettison_inputstruct(is); /* Free IS */
+  jettison_inputstruct(is);
 }
 
-int cycle_rec(Person* p, Dllist tmp) {
+int check_cycle(Person* p, Dllist tmp) {
   if(p->visited == 1) { return 1; }
   p->visited = 1;
   dll_traverse(tmp, p->kid_list) {
     Person* p = ((Person*)tmp->val.v);
-    if(cycle_rec(p, tmp)) { return 1; }
+    if(check_cycle(p, tmp)) { return 1; }
   }
   p->visited = 0;
 
   return 0;
-}
-
-void Cycle_Check(JRB tree, JRB tmp, Dllist index) {
-  /* Check Cycles on each person in tree */
-  jrb_traverse(tmp, tree) {
-    Person* p = (Person*) tmp->val.v;
-    if(cycle_rec(p, index) == 1) {
-      fprintf(stderr, "Bad input -- cycle in specification\n");
-      free_everything(tree, tmp);
-      exit(1);
-    }
-  }
 }
 
 void topological(JRB tree, JRB tmp, Dllist index) {
@@ -223,7 +218,8 @@ void topological(JRB tree, JRB tmp, Dllist index) {
     if(p->dad != NULL) { p->dependencies++; }
     if(p->mom != NULL) { p->dependencies++; }
     /* Add to queue if 0 dependencies */
-    if(p->dependencies == 0) { dll_append(queue, new_jval_v((void*) p)); }
+    if(p->dependencies == 0) { dll_append(queue, new_jval_v((void*) p));
+    }
   }
 
   while(!dll_empty(queue)) {
@@ -235,9 +231,7 @@ void topological(JRB tree, JRB tmp, Dllist index) {
     if(dll_empty(p->kid_list)) { continue; }
     dll_traverse(index, p->kid_list) {
       Person* child = (Person*)index->val.v; 
-      if(--child->dependencies == 0) { 
-        dll_append(queue, new_jval_v((void*) child));
-      }
+      if(--child->dependencies == 0) { dll_append(queue, new_jval_v((void*) child));}
     }
   }
 
@@ -251,8 +245,14 @@ int main(int argc, char **argv) {
   read_stdin(&tree, tmp);
 
   Dllist index;
-
-  Cycle_Check(tree, tmp, index);
+  jrb_traverse(tmp, tree) {
+    Person* p = (Person*) tmp->val.v;
+    if(check_cycle(p, index) == 1) {
+      fprintf(stderr, "Bad input -- cycle in specification\n");
+      free_everything(tree, tmp);
+      return 1;
+    }
+  }
   topological(tree, tmp, index);
 
   /* Freeing Everything*/
