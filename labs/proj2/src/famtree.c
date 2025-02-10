@@ -8,7 +8,8 @@
 
 typedef struct person {
   char *name, sex;
-  char visited;
+  char visited, printed;
+  int dependencies;
   struct person *dad, *mom;
   Dllist kid_list;
 } Person;
@@ -52,7 +53,9 @@ Person* create_person(char* name, JRB *tree) {
   p->dad = NULL;
   p->mom = NULL;
   p->sex = 'U';
+  p->printed = 0;
   p->visited = 0;
+  p->dependencies = 0;
   p->kid_list = new_dllist();
   jrb_insert_str(*tree, name, new_jval_v((void*) p));
 
@@ -152,6 +155,34 @@ int check_cycle(Person* p, Dllist tmp) {
   return 0;
 }
 
+void topological(JRB tree, JRB tmp) {
+  Dllist queue = new_dllist();
+
+  /* Calculate dependencies first */
+  jrb_traverse(tmp, tree) {
+    Person* p = (Person*)tmp->val.v;
+    if(p->dad != NULL) { p->dependencies++; }
+    if(p->mom != NULL) { p->dependencies++; }
+    /* Add to queue if 0 dependencies */
+    if(p->dependencies == 0) { dll_append(queue, new_jval_v((void*) p)); }
+  }
+
+  Dllist index;
+  while(!dll_empty(queue)) {
+    Person* p = (Person*)dll_first(queue)->val.v;
+    dll_delete_node(dll_first(queue));              /* Pop first Dllist*/
+    print(p);
+
+    /* Index through children*/
+    dll_traverse(index, p->kid_list) {
+      Person* child = (Person*)index->val.v; 
+      if(--child->dependencies == 0) { dll_append(queue, new_jval_v((void*) child));}
+    }
+  }
+
+  free_dllist(queue);
+}
+
 int main(int argc, char **argv) {
   /* Read from stdin */
   JRB tree = make_jrb();
@@ -159,15 +190,16 @@ int main(int argc, char **argv) {
 
   Dllist index;
   JRB tmp;
-
   jrb_traverse(tmp, tree) {
     Person* p = (Person*) tmp->val.v;
-    print(p);
+    // print(p);
+    // printf("%s - %d\n", p->name, p->dependencies);
     if(check_cycle(p, index) == 1) {
       fprintf(stderr, "Bad input-- cycle in specification\n");
       return 1;
     }
   }
+  // topological(tree, tmp);
 
   /* Freeing Everything*/
   jrb_traverse(tmp, tree) {
