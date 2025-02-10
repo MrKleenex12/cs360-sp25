@@ -92,8 +92,9 @@ void add_parent(Person* p1, Person* p2, const char c) {
   else {p1->mom = p2;}
 }
 
-void add_kid(Person* p1, Person* p2) {
+void add_kid(Person* p1, Person* p2, const char c) {
   dll_append(p1->kid_list, new_jval_v((void*) p2));
+  p1->sex = c;
 }
 
 void read_stdin(JRB *tree) {
@@ -114,8 +115,8 @@ void read_stdin(JRB *tree) {
     /* Relational Links*/
     if(strcmp(is->fields[0], "FATHER") == 0) { add_parent(p1, p2, 'M'); }
     else if(strcmp(is->fields[0], "MOTHER") == 0) { add_parent(p1, p2, 'F'); }
-    else if(strcmp(is->fields[0], "FATHER_OF") == 0) { add_kid(p1, p2); }
-    else if(strcmp(is->fields[0], "MOTHER_OF") == 0) { add_kid(p1, p2); }
+    else if(strcmp(is->fields[0], "FATHER_OF") == 0) { add_kid(p1, p2, 'M'); }
+    else if(strcmp(is->fields[0], "MOTHER_OF") == 0) { add_kid(p1, p2, 'F'); }
     else if(strcmp(is->fields[0], "SEX") == 0) {
       p1->sex = *(is->fields[1]);
       free(name);
