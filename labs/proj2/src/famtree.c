@@ -128,8 +128,8 @@ int add_kid(Person* p1, Person* p2, const char c) {
 
   dll_append(p1->kid_list, new_jval_v((void*) p2));
   p1->sex = c;
-  Person* to_change = (c == 'M') ? p2->dad : p2->mom;
-  to_change = p1;
+  if(c == 'M') { p2->dad = p1; } 
+  else { p2->mom = p1; }
 
   return 0;
 }
