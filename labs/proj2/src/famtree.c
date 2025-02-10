@@ -100,30 +100,23 @@ void add_parent(Person* p1, Person* p2, const char c) {
   /* Father */
   if(c == 'M') {
     /* Error Check */
-    if(p1->dad == NULL) {
-      p1->dad = p2; 
-      dll_append(p2->kid_list, new_jval_v((void*) p1));
-    }
+    p1->dad = p2; 
+    dll_append(p2->kid_list, new_jval_v((void*) p1));
   }
   /* Mother */
   else {
     /* Error Check */
-    if(p1->mom == NULL) {
-      p1->mom = p2; 
-      dll_append(p2->kid_list, new_jval_v((void*) p1));
-    }
+    p1->mom = p2; 
+    dll_append(p2->kid_list, new_jval_v((void*) p1));
   }
 }
 
 void add_kid(Person* p1, Person* p2, const char c) {
   dll_append(p1->kid_list, new_jval_v((void*) p2));
+
   p1->sex = c;
-  if(c == 'M') { 
-    p2->dad = p1;
-  } 
-  else {
-    p2->mom = p1;
-  }
+  if(c == 'M') { p2->dad = p1; } 
+  else { p2->mom = p1; }
 }
 
 void read_stdin(JRB *tree) {
@@ -139,9 +132,17 @@ void read_stdin(JRB *tree) {
       p1 = create_person(name, tree);
       continue;
     }
+
     // Update p2 if not SEX line
     if(strcmp(is->fields[0], "SEX") == 0) {
-      p1->sex = *(is->fields[1]);
+      char sex = *(is->fields[1]);
+      if(p1->sex != 'U' && p1->sex != sex) {
+        fprintf(stderr, "Bad input - sex mismatch on line %d\n", is->line);
+        JRB tmp;
+        free_everything(*tree, tmp);
+        exit(1);
+      }
+      p1->sex = sex;
       free(name);
     } 
     else { p2 = create_person(name, tree);}
