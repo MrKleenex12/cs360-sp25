@@ -9,7 +9,6 @@
 typedef struct person {
   char *name, sex;
   struct person *dad, *mom;
-  int nkids;
   Dllist kid_list;
 } Person;
 
@@ -66,6 +65,19 @@ void free_person(Person *p) {
   free(p);
 }
 
+void print(Person* p) {
+  printf("%s - %c\n", p->name, p->sex);
+  if(p->dad != NULL) { printf("  Dad: %s\n", p->dad->name); }
+  else { printf("  Dad Unknown\n"); }
+  if(p->mom != NULL) { printf("  Mom: %s\n", p->mom->name); }
+  else { printf("  Mom Unknown\n"); }
+  Dllist tmp;
+  dll_traverse(tmp, p->kid_list) {
+    Person* p2 = (Person*)tmp->val.v;
+    printf("  Kid: %s\n", p2->name);
+  }
+}
+
 void add_parent(Person* p1, Person* p2, const char c) {
   if(c == 'M') { p1->dad = p2; }
   else {p1->mom = p2;}
@@ -75,8 +87,8 @@ void add_kid(Person* p1, Person* p2) {
   dll_append(p1->kid_list, new_jval_v((void*) p2));
 }
 
-int read_file(const char* filename, JRB *tree) {
-  IS is = new_inputstruct(filename);
+int read_stdin(JRB *tree) {
+  IS is = new_inputstruct(NULL);
   if(NULL == is) {  return 1; }                   /* Quit if reading argv went wrong */
   Person *p1, *p2;
 
@@ -117,15 +129,9 @@ int read_file(const char* filename, JRB *tree) {
 }
 
 int main(int argc, char **argv) {
-  /* Check Usage */
-  if(2 != argc) {
-    fprintf(stderr, "usage: bin/famtree filenames\n");
-    exit(1);
-  }
-
-  /* Check valid file */
+  /* Read from stdin */
   JRB tree = make_jrb();
-  if(1 == read_file(argv[1], &tree)) {
+  if(1 == read_stdin(&tree)) {
     perror(argv[1]);
     return 1; 
   };
@@ -133,8 +139,10 @@ int main(int argc, char **argv) {
   JRB tmp;
   jrb_traverse(tmp, tree) {
     Person* p = (Person*) tmp->val.v;
-    printf("%s - %c\n", p->name, p->sex); 
-    free_person(p);
+    print(p);
+  }
+  jrb_traverse(tmp, tree) {
+    free_person((Person*)tmp->val.v);
   }
 
   jrb_free_tree(tree);
