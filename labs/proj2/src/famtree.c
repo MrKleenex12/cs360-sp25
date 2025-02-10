@@ -108,6 +108,7 @@ int read_file(const char* filename, JRB *tree) {
     }
     else if(strcmp(is->fields[0], "SEX") == 0) {
       p1->sex = *(is->fields[1]);
+      free(name);
     }
   }
 
