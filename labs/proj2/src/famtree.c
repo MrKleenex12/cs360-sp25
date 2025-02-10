@@ -97,7 +97,7 @@ void print(Person* p) {
 
 int add_parent(Person* p1, Person* p2, const char c) {
   p2->sex = c;
-  
+
   if(c == 'M') {    /* Father */
     if(p1->dad != NULL) { return 1; }
     p1->dad = p2; 
@@ -162,7 +162,7 @@ void read_stdin(JRB *tree, JRB tmp) {
 
     /* Relational Links*/
     if(strcmp(is->fields[0], "FATHER") == 0) { 
-      add_parent(p1, p2, 'M');
+      if(add_parent(p1, p2, 'M')) { double_parent(is, tree, tmp, 'M'); }
     }
     else if(strcmp(is->fields[0], "MOTHER") == 0) {
       if(add_parent(p1, p2, 'F')) { double_parent(is, tree, tmp, 'F'); }
