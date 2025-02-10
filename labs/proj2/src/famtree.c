@@ -96,6 +96,7 @@ void add_parent(Person* p1, Person* p2, const char c) {
     /* Error Check */
     if(p1->dad == NULL) {
       p1->dad = p2; 
+      dll_append(p2->kid_list, new_jval_v((void*) p1));
     }
   }
   /* Mother */
@@ -103,6 +104,7 @@ void add_parent(Person* p1, Person* p2, const char c) {
     /* Error Check */
     if(p1->mom == NULL) {
       p1->mom = p2; 
+      dll_append(p2->kid_list, new_jval_v((void*) p1));
     }
   }
 }
@@ -110,7 +112,8 @@ void add_parent(Person* p1, Person* p2, const char c) {
 void add_kid(Person* p1, Person* p2, const char c) {
   dll_append(p1->kid_list, new_jval_v((void*) p2));
   p1->sex = c;
-  add_parent(p2, p1, c);
+  if(c == 'M') { p2->dad = p1; } 
+  else { p2->mom = p1; }
 }
 
 void read_stdin(JRB *tree) {
@@ -155,25 +158,28 @@ int check_cycle(Person* p, Dllist tmp) {
   return 0;
 }
 
-void topological(JRB tree, JRB tmp) {
+void topological(JRB tree, JRB tmp, Dllist index) {
   Dllist queue = new_dllist();
-
   /* Calculate dependencies first */
   jrb_traverse(tmp, tree) {
     Person* p = (Person*)tmp->val.v;
     if(p->dad != NULL) { p->dependencies++; }
     if(p->mom != NULL) { p->dependencies++; }
     /* Add to queue if 0 dependencies */
-    if(p->dependencies == 0) { dll_append(queue, new_jval_v((void*) p)); }
+    if(p->dependencies == 0) { 
+      dll_append(queue, new_jval_v((void*) p));
+      // printf("%s\n", p->name);
+    }
   }
 
-  Dllist index;
   while(!dll_empty(queue)) {
     Person* p = (Person*)dll_first(queue)->val.v;
     dll_delete_node(dll_first(queue));              /* Pop first Dllist*/
     print(p);
+    p->printed = 1;
 
     /* Index through children*/
+    if(dll_empty(p->kid_list)) { continue; }
     dll_traverse(index, p->kid_list) {
       Person* child = (Person*)index->val.v; 
       if(--child->dependencies == 0) { dll_append(queue, new_jval_v((void*) child));}
@@ -192,14 +198,13 @@ int main(int argc, char **argv) {
   JRB tmp;
   jrb_traverse(tmp, tree) {
     Person* p = (Person*) tmp->val.v;
-    // print(p);
-    // printf("%s - %d\n", p->name, p->dependencies);
     if(check_cycle(p, index) == 1) {
       fprintf(stderr, "Bad input-- cycle in specification\n");
       return 1;
     }
+    print(p);
   }
-  topological(tree, tmp);
+  topological(tree, tmp, index);
 
   /* Freeing Everything*/
   jrb_traverse(tmp, tree) {
