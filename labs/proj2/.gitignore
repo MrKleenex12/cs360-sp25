@@ -7,5 +7,6 @@ data/*
 !bin/.keep
 !data/.keep
 .vscode
+grade*
 testing
 makefile
