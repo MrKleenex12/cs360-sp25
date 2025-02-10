@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Bad input-- cycle in specification\n");
       return 1;
     }
-    print(p);
+    // print(p);
   }
   topological(tree, tmp, index);
 
