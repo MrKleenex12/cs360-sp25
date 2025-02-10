@@ -62,10 +62,15 @@ Person* create_person(char* name, JRB *tree) {
   return p;
 }
 
-void free_person(Person* p) {
-  free(p->name);
-  free_dllist(p->kid_list);
-  free(p);
+void free_everything(JRB tree, JRB tmp) {
+  jrb_traverse(tmp, tree) {
+    Person* p = ((Person*)tmp->val.v);
+    free(p->name);
+    free_dllist(p->kid_list);
+    free(p);
+  }
+  jrb_free_tree(tree);
+
 }
 
 void print(Person* p) {
@@ -205,6 +210,7 @@ int main(int argc, char **argv) {
     Person* p = (Person*) tmp->val.v;
     if(check_cycle(p, index) == 1) {
       fprintf(stderr, "Bad input-- cycle in specification\n");
+      free_everything(tree, tmp);
       return 1;
     }
     // print(p);
@@ -212,9 +218,6 @@ int main(int argc, char **argv) {
   topological(tree, tmp, index);
 
   /* Freeing Everything*/
-  jrb_traverse(tmp, tree) {
-    free_person((Person*)tmp->val.v);
-  }
-
-  jrb_free_tree(tree);
+  free_everything(tree, tmp);
+  return 0;
 }
