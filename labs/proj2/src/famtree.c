@@ -112,8 +112,14 @@ void add_parent(Person* p1, Person* p2, const char c) {
 void add_kid(Person* p1, Person* p2, const char c) {
   dll_append(p1->kid_list, new_jval_v((void*) p2));
   p1->sex = c;
-  if(c == 'M') { p2->dad = p1; } 
-  else { p2->mom = p1; }
+  if(c == 'M') { 
+    p2->dad = p1;
+    p1->sex = 'M';
+  } 
+  else {
+    p2->mom = p1;
+    p1->sex = 'F';
+  }
 }
 
 void read_stdin(JRB *tree) {
