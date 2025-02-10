@@ -79,8 +79,9 @@ void print(Person* p) {
   if(dll_empty(p->kid_list)) { printf("  Children: None\n"); }
   else {
     Dllist tmp;
+    printf("  Children:\n");
     dll_traverse(tmp, p->kid_list) {
-      printf("  Children: %s\n", ((Person*)tmp->val.v)->name);
+      printf("    %s\n", ((Person*)tmp->val.v)->name);
     }
   }
   printf("\n");
