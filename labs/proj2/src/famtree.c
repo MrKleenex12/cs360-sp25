@@ -111,15 +111,24 @@ void add_parent(Person* p1, Person* p2, const char c) {
   }
 }
 
-void add_kid(Person* p1, Person* p2, const char c) {
+int add_kid(Person* p1, Person* p2, const char c) {
+  if(p1->sex != c && p1->sex != 'U') { return 1; }
   dll_append(p1->kid_list, new_jval_v((void*) p2));
 
   p1->sex = c;
   if(c == 'M') { p2->dad = p1; } 
   else { p2->mom = p1; }
+
+  return 0;
 }
 
-void read_stdin(JRB *tree) {
+void sex_error(IS is, JRB *tree, JRB tmp) {
+  fprintf(stderr, "Bad input - sex mismatch on line %d\n", is->line);
+  free_everything(*tree, tmp);
+  exit(1);
+}
+
+void read_stdin(JRB *tree, JRB tmp) {
   IS is = new_inputstruct(NULL);
   Person *p1, *p2;
 
@@ -136,22 +145,25 @@ void read_stdin(JRB *tree) {
     // Update p2 if not SEX line
     if(strcmp(is->fields[0], "SEX") == 0) {
       char sex = *(is->fields[1]);
-      if(p1->sex != 'U' && p1->sex != sex) {
-        fprintf(stderr, "Bad input - sex mismatch on line %d\n", is->line);
-        JRB tmp;
-        free_everything(*tree, tmp);
-        exit(1);
-      }
+      if(p1->sex != 'U' && p1->sex != sex) { sex_error(is, tree, tmp); }
       p1->sex = sex;
       free(name);
     } 
     else { p2 = create_person(name, tree);}
 
     /* Relational Links*/
-    if(strcmp(is->fields[0], "FATHER") == 0) { add_parent(p1, p2, 'M'); }
-    else if(strcmp(is->fields[0], "MOTHER") == 0) { add_parent(p1, p2, 'F'); }
-    else if(strcmp(is->fields[0], "FATHER_OF") == 0) { add_kid(p1, p2, 'M'); }
-    else if(strcmp(is->fields[0], "MOTHER_OF") == 0) { add_kid(p1, p2, 'F'); }
+    if(strcmp(is->fields[0], "FATHER") == 0) { 
+      add_parent(p1, p2, 'M');
+    }
+    else if(strcmp(is->fields[0], "MOTHER") == 0) {
+      add_parent(p1, p2, 'F');
+    }
+    else if(strcmp(is->fields[0], "FATHER_OF") == 0) {
+      add_kid(p1, p2, 'M');
+    }
+    else if(strcmp(is->fields[0], "MOTHER_OF") == 0) {
+      if(add_kid(p1, p2, 'F')) { sex_error(is, tree, tmp); }
+    }
   }
 
   jettison_inputstruct(is);
@@ -202,11 +214,11 @@ void topological(JRB tree, JRB tmp, Dllist index) {
 
 int main(int argc, char **argv) {
   /* Read from stdin */
-  JRB tree = make_jrb();
-  read_stdin(&tree);
+  JRB tree, tmp;
+  tree= make_jrb();
+  read_stdin(&tree, tmp);
 
   Dllist index;
-  JRB tmp;
   jrb_traverse(tmp, tree) {
     Person* p = (Person*) tmp->val.v;
     if(check_cycle(p, index) == 1) {
