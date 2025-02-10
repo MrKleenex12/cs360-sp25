@@ -83,6 +83,7 @@ void print(Person* p) {
       printf("  Children: %s\n", ((Person*)tmp->val.v)->name);
     }
   }
+  printf("\n");
 }
 
 void add_parent(Person* p1, Person* p2, const char c) {
