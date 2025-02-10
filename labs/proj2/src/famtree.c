@@ -66,15 +66,25 @@ void free_person(Person *p) {
 }
 
 void print(Person* p) {
-  printf("%s - %c\n", p->name, p->sex);
-  if(p->dad != NULL) { printf("  Dad: %s\n", p->dad->name); }
-  else { printf("  Dad Unknown\n"); }
-  if(p->mom != NULL) { printf("  Mom: %s\n", p->mom->name); }
-  else { printf("  Mom Unknown\n"); }
-  Dllist tmp;
-  dll_traverse(tmp, p->kid_list) {
-    Person* p2 = (Person*)tmp->val.v;
-    printf("  Kid: %s\n", p2->name);
+  printf("%s\n", p->name);
+
+  printf("  Sex: ");
+  if(p->sex != 'U') { printf("%c\n", p->sex); }
+  else { printf("Unknown\n"); }
+  printf("  Father: ");
+  if(p->dad != NULL) { printf("%s\n", p->dad->name); }
+  else { printf("Unknown\n"); }
+  printf("  Mother: ");
+  if(p->mom != NULL) { printf("%s\n", p->mom->name); }
+  else { printf("Unknown\n"); }
+
+  if(dll_empty(p->kid_list)) { printf("  Children: None\n"); }
+  else {
+    Dllist tmp;
+    dll_traverse(tmp, p->kid_list) {
+      Person* p2 = (Person*)tmp->val.v;
+      printf("  Children: %s\n", p2->name);
+    }
   }
 }
 
