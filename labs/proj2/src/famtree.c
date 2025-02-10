@@ -209,7 +209,7 @@ int main(int argc, char **argv) {
   jrb_traverse(tmp, tree) {
     Person* p = (Person*) tmp->val.v;
     if(check_cycle(p, index) == 1) {
-      fprintf(stderr, "Bad input-- cycle in specification\n");
+      fprintf(stderr, "Bad input -- cycle in specification\n");
       free_everything(tree, tmp);
       return 1;
     }
