@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
       return 1;
     }
   }
-  // topological(tree, tmp);
+  topological(tree, tmp);
 
   /* Freeing Everything*/
   jrb_traverse(tmp, tree) {
