@@ -91,6 +91,7 @@ void print(Person* p) {
 }
 
 void add_parent(Person* p1, Person* p2, const char c) {
+  p2->sex = c;
   /* Father */
   if(c == 'M') {
     /* Error Check */
@@ -114,11 +115,9 @@ void add_kid(Person* p1, Person* p2, const char c) {
   p1->sex = c;
   if(c == 'M') { 
     p2->dad = p1;
-    p1->sex = 'M';
   } 
   else {
     p2->mom = p1;
-    p1->sex = 'F';
   }
 }
 
