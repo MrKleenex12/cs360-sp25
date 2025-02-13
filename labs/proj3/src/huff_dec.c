@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -20,7 +21,7 @@ off_t get_file_size(const char* file_name) {
   }
 }
 
-/* Last 4 bytes indicate how many bits should be read */
+/* last 4 bytes indicate how many bits should be read */
 uint32_t last_four(const char* file_name, const off_t fsize) {
   FILE* f = fopen(file_name, "r");
   if(f == NULL) { return 1; }       /* Fail if can't read file */ 
@@ -35,23 +36,43 @@ uint32_t last_four(const char* file_name, const off_t fsize) {
   return nbits;
 }
 
-void cat(const char* file_name) {
+char* read_string(const char* buff, size_t *curr, size_t *last) {
+  while(buff[*curr] != 0) { (*curr)++; }
+  int len = *curr - *last;
+  char *str = (char*)malloc((len+1) * sizeof(char));
+  snprintf(str, len+1, "%s", buff + *last);
+  *last = ++(*curr);
+  return str;
+}
+
+void open_code_file(const char* file_name, const off_t fsize) {
   FILE* f = fopen(file_name, "rb");  // Open in binary mode to avoid issues with line endings
   if (!f) {
     perror(file_name);
     return;
   }
-  unsigned char buffer[BUFFSIZE];
-  size_t bytesRead;
+  char buff[fsize];
+  size_t nobjects;
 
-  while ((bytesRead = fread(buffer, 1, sizeof(buffer), f)) > 0) {
-    for (size_t i = 0; i < bytesRead; i++) {
-      // printf("%02x ", buffer[i]);  // Print each byte as hex
-      printf("%c", buffer[i]);  // Print each byte as char 
+  while ((nobjects = fread(buff, 1, sizeof(buff), f)) > 0) {
+    size_t curr = 0;
+    size_t last = 0;
+
+    while(curr < nobjects) {
+      /* Read string */
+      char* str = read_string(buff, &curr, &last);
+      /* 
+      printf("string: %s \n", str);
+      */
+      free(str);
+
+      /* Read Sequence of bits */
+      while(buff[curr] != 0) {
+        curr++;
+      }
+      last = ++curr;
     }
   }
-  printf("\n");
- 
   fclose(f);
 }
 
@@ -62,10 +83,10 @@ int main(int argc, char** argv) {
     perror(argv[1]);
     return 1;
   } else {
-    cat(argv[1]);
-    printf("%10lld - %s\n", file_size, argv[1]);
-    int nbits = last_four(argv[1], file_size);
-    printf("number of bits:  %d\n", nbits);
+    open_code_file(argv[1], file_size);
+    // printf("%10lld - %s\n", file_size, argv[1]);
+    // int nbits = last_four(argv[1], file_size);
+    // printf("number of bits:  %d\n", nbits);
   }
 
   return 0;
