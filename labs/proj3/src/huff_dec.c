@@ -207,6 +207,9 @@ int main(int argc, char** argv) {
     delete_tree(head);
     return 1;
   }
+  if(nbits == 0) {
+    printf("No bits read\n");
+  }
 
   char* bit_stream = decrypt_file(argv[2], file_size, nbits);
   if(bit_stream == NULL) {
