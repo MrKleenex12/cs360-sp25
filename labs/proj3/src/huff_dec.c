@@ -161,11 +161,24 @@ char* decrypt_file(const char* file_name, const off_t fsize, const int nbits) {
     /* Add in bits by sets of 8 */
     for(i = 0; i < times; i++) { binary(buff[i], bit_str+(8*i), 8); }
     /* Add in remaning bits */
-    if(nbits % 8 != 0) { binary(buff[i+1], bit_str+(8*times), nbits%8); }
-    printf("%s\n", bit_str);
+    if(nbits % 8 != 0) { binary(buff[i], bit_str+(8*times), nbits%8); }
   }
   close(fd);
   return bit_str; 
+}
+
+void output(HN* head, const char* bit_stream) {
+  HN* curr = head;  
+  for(int i = 0; i < (int)strlen(bit_stream); i++) {
+    int bit = bit_stream[i]-48;
+    if(curr->strings[bit] == NULL) {
+      curr = curr->ptrs[bit];
+      continue;
+    }
+
+    printf("%s", curr->strings[bit]);
+    curr = head;
+  }
 }
 
 int main(int argc, char** argv) {
@@ -189,7 +202,8 @@ int main(int argc, char** argv) {
   }
 
   char* bit_stream = decrypt_file(argv[2], file_size, nbits);
-  // print(head);
+  output(head, bit_stream);
+
 
   free(bit_stream);
   delete_tree(head);
