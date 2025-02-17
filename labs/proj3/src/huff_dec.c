@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
   HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
 
   file_size =  get_fsize(argv[2]);
-  if(file_size <= 4) {
+  if(file_size < 4) {
     fprintf(stderr, "Error: file is not the correct size.\n");
     delete_tree(head);
     return 1;
