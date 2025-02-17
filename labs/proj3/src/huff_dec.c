@@ -23,7 +23,10 @@ HN* create_hn() {
 off_t get_fsize(const char* file_name) {
   struct stat st;
   if(stat(file_name, &st) >= 0) { return st.st_size; }
-  else {  return -1;  }
+  else {
+    perror(file_name);
+    exit(1);
+  }
 }
 
 /* last 4 bytes indicate how many bits should be read */
@@ -97,10 +100,15 @@ void add_to_tree(HN* head, char* str, const char* buff, int* curr) {
   prev_HN->strings[old_bit] = str;    /* Set string to be str; */
 }
 
-int open_code_file(const char* file_name, const off_t fsize, HN* head) {
+HN* open_code_file(const char* file_name, const off_t fsize) {
   /* Open in binary mode to avoid issues with line endings */
   FILE* f = fopen(file_name, "rb");
-  if (f == NULL) {   return 1;   }
+  if (f == NULL) {
+    perror(file_name);
+    exit(1);
+  }
+
+  HN* head = create_hn();
   /* Read in file into char array */
   char buff[fsize];
   int nobjects;
@@ -122,25 +130,18 @@ int open_code_file(const char* file_name, const off_t fsize, HN* head) {
   }
 
   fclose(f);
-  return 0;
+  return head;
 }
 
 int main(int argc, char** argv) {
+  /* Error Check code definition file */
   off_t error = get_fsize(argv[1]);
-  if(error == -1) {
-    perror(argv[1]);
-    return 1;
-  }
-
+  
+  /* Read in code definition file */
   off_t file_size = error;
-  HN* head = create_hn();
-  error = open_code_file(argv[1], file_size, head);
-  if(error == -1) {
-    perror(argv[1]);
-    return 1;
-  }
+  HN* head = open_code_file(argv[1], file_size);
 
-  print(head);
+  // print(head);
   // printf("%10lld - %str\n", file_size, argv[1]);
   // int nbits = four_bits(argv[1], file_size);
   // printf("number of bits:  %d\n", nbits);
