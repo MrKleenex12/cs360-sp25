@@ -203,12 +203,9 @@ int main(int argc, char** argv) {
     return 1;
   }
   off_t nbits = four_bits(argv[2], file_size);
-  if(nbits == -1) { 
+  if(nbits == -1 || nbits == 0) { 
     delete_tree(head);
     return 1;
-  }
-  if(nbits == 0) {
-    printf("No bits read\n");
   }
 
   char* bit_stream = decrypt_file(argv[2], file_size, nbits);
