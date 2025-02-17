@@ -102,9 +102,9 @@ void add_to_tree(HN* head, char* str, const char* buff, int* curr) {
 
 HN* open_code_file(const char* file_name, const off_t fsize) {
   /* Error Check: Code definition file */
-  FILE* f = fopen(file_name, "rb");
-  if (f == NULL) {
-    perror(file_name);
+  int fd = open(file_name, O_RDONLY);
+  if (fd == -1) {
+    perror("Error opening file");
     exit(1);
   }
 
@@ -112,24 +112,60 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
   char buff[fsize];                 /* Read in file into char array */
   int nobjects;                     /* Helper variable to read in file */
   
-  while ((nobjects = fread(buff, 1, sizeof(buff), f)) > 0) {
+  while ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
     int curr_index = 0;
     int last_index = 0;
-
     /* Read in whole file as a string */
     while(curr_index < nobjects) {
       /* Read string */
       char* str = read_string(buff, &curr_index, &last_index);
       last_index = ++curr_index;    /* Update index */
-
       /* Read Sequence of bits */
       add_to_tree(head, str, buff, &curr_index);
       last_index = ++curr_index;    /* Update index */
     }
   }
-
-  fclose(f);
+  close(fd);
   return head;
+}
+
+void binary(unsigned char c, char* str, const int bits) {
+  for(int i = 0; i < bits; i++) {
+    str[i] = (((c >> i) & 1) ? '1' : '0');
+  }
+
+  str[bits] = '\0';
+}
+
+char* decrypt_file(const char* file_name, const off_t fsize, const int nbits) {
+  int fd = open(file_name, O_RDONLY);
+  if (fd == -1) {
+    perror("Error opening file");
+    exit(1);
+  }
+
+  char buff[fsize];  // Read in chunks
+  int nobjects;
+  /* Alloc memory for string of bit stream */
+  char* str = (char*)malloc((nbits+1) * sizeof(char));
+
+  while ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
+    /* Error check that number of bits is in file */
+    if((nobjects-4) * 8 < nbits) {
+      fprintf(stderr, "error reading bits\n");
+      exit(1);
+    }
+
+    int times = nbits / 8;
+    int i;
+    /* Add in bits by sets of 8 */
+    for(i = 0; i < times; i++) { binary(buff[i], str+(8*i), 8); }
+    /* Add in remaning bits */
+    if(nbits % 8 != 0) { binary(buff[i+1], str+(8*times), nbits%8); }
+    // printf("%s\n", str);
+  }
+  close(fd);
+  return str; 
 }
 
 int main(int argc, char** argv) {
@@ -142,11 +178,19 @@ int main(int argc, char** argv) {
   off_t file_size =  get_fsize(argv[1]);            /* File size of code definition file */
   HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
 
-  // print(head);
-  // printf("%10lld - %str\n", file_size, argv[1]);
-  // int nbits = four_bits(argv[1], file_size);
-  // printf("number of bits:  %d\n", nbits);
+  file_size =  get_fsize(argv[2]);
+  if(file_size <= 4) {
+    fprintf(stderr, "File less than 4 bytes\n");
+    return 1;
+  }
+  /* File size of encrypted file */
+  int nbits = four_bits(argv[2], file_size);
+  printf("number of bits:  %d\n", nbits);
 
+  char* bit_stream = decrypt_file(argv[2], file_size, nbits);
+  // print(head);
+
+  free(bit_stream);
   delete_tree(head);
   return 0;
 }
