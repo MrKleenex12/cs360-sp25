@@ -72,7 +72,9 @@ void print(HN* n) {
 
 char* read_string(const char* buff, int *curr, int *last) {
   /* Continue until end of string */
-  while(buff[*curr] != 0) {   (*curr)++;    }
+  while(buff[*curr] != 0) {
+    (*curr)++;
+  }
   /* Copy string over to str */
   int len = *curr - *last + 1;
   char *str = (char*)malloc(len * sizeof(char));
@@ -110,7 +112,7 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
   }
 
   HN* head = create_hn();           /* Head of tree pointer */
-  char buff[fsize];                 /* Read in file into char array */
+  char buff[2*fsize];               /* Read in file into char array */
   int nobjects;                     /* Helper variable to read in file */
   
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
@@ -138,25 +140,24 @@ void binary(unsigned char c, char* str, const int bits) {
   str[bits] = '\0';
 }
 
-char* decrypt_file(const char* file_name, const off_t fsize, const int nbits) {
+char* decrypt_file(const char* file_name, const off_t fsize, const off_t nbits) {
   int fd = open(file_name, O_RDONLY);
   if (fd == -1) {
     perror("Error opening file");
     return NULL;
   }
+  /* Error check that number of bits is in file */
+  if(nbits != (fsize-4)*8) {
+    fprintf(stderr, "Error: Total bits = %lld, but file's size is %lld\n", nbits, fsize);
+    return NULL;
+  }
 
-  char buff[fsize];  // Read in chunks
+  char buff[2*fsize];  // Read in chunks
   int nobjects;
   /* Alloc memory for string of bit stream */
   char* bit_str = (char*)malloc((nbits+1) * sizeof(char));
 
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
-    /* Error check that number of bits is in file */
-    if((nobjects-4) * 8 < nbits) {
-      fprintf(stderr, "error reading bits\n");
-      exit(1);
-    }
-
     int times = nbits / 8;
     int i;
     /* Add in bits by sets of 8 */
@@ -192,14 +193,17 @@ int main(int argc, char** argv) {
   /* File size of encrypted file */
   off_t file_size =  get_fsize(argv[2]);            /* File size of encrypted file */
   if(file_size == -1) { return 1; }
-  int nbits = four_bits(argv[2], file_size);
-  if(nbits == -1) { return 1; }
 
   file_size =  get_fsize(argv[1]);                  /* File size of code definition file */
   HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
 
   file_size =  get_fsize(argv[2]);
   if(file_size <= 4) {
+    delete_tree(head);
+    return 1;
+  }
+  off_t nbits = four_bits(argv[2], file_size);
+  if(nbits == -1) { 
     delete_tree(head);
     return 1;
   }
