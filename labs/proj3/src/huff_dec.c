@@ -38,7 +38,6 @@ u_int32_t four_bits(const char* file_name, const off_t fsize) {
   u_int32_t nbits; 
   fseek(f, fsize-4, SEEK_SET);
   if(fread(&nbits, 4, 1, f) != 1) { /* Return 1 if can't read 4 bytes into one int*/
-    fprintf(stderr, "Error: file is not the correct size.\n");
     return -1;
   }
   fclose(f);
@@ -147,8 +146,8 @@ char* decrypt_file(const char* file_name, const off_t fsize, const off_t nbits) 
     return NULL;
   }
   /* Error check that number of bits is in file */
-  if(nbits > (fsize-4)*8) {
-    fprintf(stderr, "Error: Total bits = %lld, but file's size is %lld\n", nbits, fsize);
+  if((nbits+7)/8 + 4 > fsize) {
+    fprintf(stderr, "Error: Total bits = %ld, but file's size is %ld\n", nbits, fsize);
     return NULL;
   }
 
@@ -186,7 +185,7 @@ void output(HN* head, const char* bit_stream) {
 int main(int argc, char** argv) {
   /* Error Check: Usage */
   if(argc != 3) {
-    fprintf(stderr, "Usage: ./bin/huff_def code_def_file encrypted_file\n");
+    fprintf(stderr, "Usage: ./bin/huff_def code_def_file intput\n");
     return 1;
   }  
 
@@ -199,6 +198,7 @@ int main(int argc, char** argv) {
 
   file_size =  get_fsize(argv[2]);
   if(file_size <= 4) {
+    fprintf(stderr, "Error: file is not the correct size.\n");
     delete_tree(head);
     return 1;
   }
