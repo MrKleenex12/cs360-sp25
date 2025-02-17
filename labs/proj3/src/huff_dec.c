@@ -131,6 +131,7 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
   return head;
 }
 
+/*
 void binary(unsigned char c, char* str, const int bits) {
   for(int i = 0; i < bits; i++) {
     str[i] = (((c >> i) & 1) ? '1' : '0');
@@ -138,48 +139,50 @@ void binary(unsigned char c, char* str, const int bits) {
 
   str[bits] = '\0';
 }
+*/
+HN* binary(HN** index, HN* head, unsigned char c, const int bits) {
+  HN* hn = *index; 
+  for(int i = 0; i < bits; i++) {
+    int bit = (((c >> i) & 1) ? 1 : 0);
 
-char* decrypt_file(const char* file_name, const off_t fsize, const off_t nbits) {
+    if(hn->strings[bit] == NULL) {
+      hn = hn->ptrs[bit];
+      continue;
+    }
+    printf("%s", hn->strings[bit]);
+    hn = head;
+  }
+
+  return hn;
+}
+
+int decrypt_file(const char* file_name, HN* head, const off_t fsize, const off_t nbits) {
   int fd = open(file_name, O_RDONLY);
   if (fd == -1) {
     perror("Error opening file");
-    return NULL;
+    return -1;
   }
   /* Error check that number of bits is in file */
   if((nbits+7)/8 + 4 > fsize) {
     fprintf(stderr, "Error: Total bits = %ld, but file's size is %ld\n", nbits, fsize);
-    return NULL;
+    return -1;
   }
 
   char buff[2*fsize];  // Read in chunks
   int nobjects;
   /* Alloc memory for string of bit stream */
-  char* bit_str = (char*)malloc((nbits+1) * sizeof(char));
 
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
+    HN* index = head;
     int times = nbits / 8;
     int i;
-    /* Add in bits by sets of 8 */
-    for(i = 0; i < times; i++) { binary(buff[i], bit_str+(8*i), 8); }
-    /* Add in remaning bits */
-    if(nbits % 8 != 0) { binary(buff[i], bit_str+(8*times), nbits%8); }
+    for(i = 0; i < times; i++) {
+      binary(&index, head, buff[i], 8);
+    }
+    if(nbits % 8 != 0) { binary(&index, head, buff[i], nbits%8); }
   }
   close(fd);
-  return bit_str; 
-}
-
-void output(HN* head, const char* bit_stream) {
-  HN* curr = head;  
-  for(int i = 0; i < (int)strlen(bit_stream); i++) {
-    int bit = bit_stream[i]-48;
-    if(curr->strings[bit] == NULL) {
-      curr = curr->ptrs[bit];
-      continue;
-    }
-
-    printf("%s", curr->strings[bit]);
-    curr = head;
-  }
+  return 0;
 }
 
 int main(int argc, char** argv) {
@@ -208,15 +211,13 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  char* bit_stream = decrypt_file(argv[2], file_size, nbits);
-  if(bit_stream == NULL) {
+  int error = decrypt_file(argv[2], head, file_size, nbits);
+
+  if(error == -1) {
     delete_tree(head);
     return 1;
   }
 
-  output(head, bit_stream);
-
-  free(bit_stream);
   delete_tree(head);
   return 0;
 }
