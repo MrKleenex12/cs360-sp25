@@ -75,7 +75,7 @@ char* read_string(const char* buff, int *curr, int *last) {
   /* Copy string over to str */
   int len = *curr - *last + 1;
   char *str = (char*)malloc(len * sizeof(char));
-  snprintf(str, len, "%str", buff + *last);
+  snprintf(str, len, "%s", buff + *last);
 
   return str;
 }
@@ -112,7 +112,7 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
   char buff[fsize];                 /* Read in file into char array */
   int nobjects;                     /* Helper variable to read in file */
   
-  while ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
+  if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
     int curr_index = 0;
     int last_index = 0;
     /* Read in whole file as a string */
@@ -147,9 +147,9 @@ char* decrypt_file(const char* file_name, const off_t fsize, const int nbits) {
   char buff[fsize];  // Read in chunks
   int nobjects;
   /* Alloc memory for string of bit stream */
-  char* str = (char*)malloc((nbits+1) * sizeof(char));
+  char* bit_str = (char*)malloc((nbits+1) * sizeof(char));
 
-  while ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
+  if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
     /* Error check that number of bits is in file */
     if((nobjects-4) * 8 < nbits) {
       fprintf(stderr, "error reading bits\n");
@@ -159,13 +159,13 @@ char* decrypt_file(const char* file_name, const off_t fsize, const int nbits) {
     int times = nbits / 8;
     int i;
     /* Add in bits by sets of 8 */
-    for(i = 0; i < times; i++) { binary(buff[i], str+(8*i), 8); }
+    for(i = 0; i < times; i++) { binary(buff[i], bit_str+(8*i), 8); }
     /* Add in remaning bits */
-    if(nbits % 8 != 0) { binary(buff[i+1], str+(8*times), nbits%8); }
-    // printf("%s\n", str);
+    if(nbits % 8 != 0) { binary(buff[i+1], bit_str+(8*times), nbits%8); }
+    printf("%s\n", bit_str);
   }
   close(fd);
-  return str; 
+  return bit_str; 
 }
 
 int main(int argc, char** argv) {
@@ -175,7 +175,11 @@ int main(int argc, char** argv) {
     return 1;
   }  
 
-  off_t file_size =  get_fsize(argv[1]);            /* File size of code definition file */
+  /* File size of encrypted file */
+  off_t file_size =  get_fsize(argv[2]);            /* File size of encrypted file */
+  int nbits = four_bits(argv[2], file_size);
+
+  file_size =  get_fsize(argv[1]);                  /* File size of code definition file */
   HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
 
   file_size =  get_fsize(argv[2]);
@@ -183,9 +187,6 @@ int main(int argc, char** argv) {
     fprintf(stderr, "File less than 4 bytes\n");
     return 1;
   }
-  /* File size of encrypted file */
-  int nbits = four_bits(argv[2], file_size);
-  printf("number of bits:  %d\n", nbits);
 
   char* bit_stream = decrypt_file(argv[2], file_size, nbits);
   // print(head);
