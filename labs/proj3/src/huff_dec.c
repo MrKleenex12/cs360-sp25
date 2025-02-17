@@ -147,7 +147,7 @@ char* decrypt_file(const char* file_name, const off_t fsize, const off_t nbits) 
     return NULL;
   }
   /* Error check that number of bits is in file */
-  if(nbits != (fsize-4)*8) {
+  if(nbits > (fsize-4)*8) {
     fprintf(stderr, "Error: Total bits = %lld, but file's size is %lld\n", nbits, fsize);
     return NULL;
   }
