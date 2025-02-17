@@ -201,6 +201,7 @@ int main(int argc, char** argv) {
   file_size =  get_fsize(argv[2]);
   if(file_size <= 4) {
     fprintf(stderr, "File less than 4 bytes\n");
+    delete_tree(head);
     return 1;
   }
 
@@ -211,7 +212,7 @@ int main(int argc, char** argv) {
   }
 
   output(head, bit_stream);
-  
+
   free(bit_stream);
   delete_tree(head);
   return 0;
