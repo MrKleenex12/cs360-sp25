@@ -38,7 +38,7 @@ u_int32_t four_bits(const char* file_name, const off_t fsize) {
   u_int32_t nbits; 
   fseek(f, fsize-4, SEEK_SET);
   if(fread(&nbits, 4, 1, f) != 1) { /* Return 1 if can't read 4 bytes into one int*/
-    fprintf(stderr, "Error: file is not the correect size.\n");
+    fprintf(stderr, "Error: file is not the correct size.\n");
     return -1;
   }
   fclose(f);
