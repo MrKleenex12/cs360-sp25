@@ -101,17 +101,16 @@ void add_to_tree(HN* head, char* str, const char* buff, int* curr) {
 }
 
 HN* open_code_file(const char* file_name, const off_t fsize) {
-  /* Open in binary mode to avoid issues with line endings */
+  /* Error Check: Code definition file */
   FILE* f = fopen(file_name, "rb");
   if (f == NULL) {
     perror(file_name);
     exit(1);
   }
 
-  HN* head = create_hn();
-  /* Read in file into char array */
-  char buff[fsize];
-  int nobjects;
+  HN* head = create_hn();           /* Head of tree pointer */
+  char buff[fsize];                 /* Read in file into char array */
+  int nobjects;                     /* Helper variable to read in file */
   
   while ((nobjects = fread(buff, 1, sizeof(buff), f)) > 0) {
     int curr_index = 0;
@@ -134,12 +133,14 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
 }
 
 int main(int argc, char** argv) {
-  /* Error Check code definition file */
-  off_t error = get_fsize(argv[1]);
-  
-  /* Read in code definition file */
-  off_t file_size = error;
-  HN* head = open_code_file(argv[1], file_size);
+  /* Error Check: Usage */
+  if(argc != 3) {
+    fprintf(stderr, "Usage: ./bin/huff_def code_def_file encrypted_file\n");
+    return 1;
+  }  
+
+  off_t file_size =  get_fsize(argv[1]);            /* File size of code definition file */
+  HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
 
   // print(head);
   // printf("%10lld - %str\n", file_size, argv[1]);
