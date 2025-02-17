@@ -20,14 +20,14 @@ HN* create_hn() {
   return hn;
 }
 
-off_t get_file_size(const char* file_name) {
+off_t get_fsize(const char* file_name) {
   struct stat st;
   if(stat(file_name, &st) >= 0) { return st.st_size; }
   else {  return -1;  }
 }
 
 /* last 4 bytes indicate how many bits should be read */
-u_int32_t last_four(const char* file_name, const off_t fsize) {
+u_int32_t four_bits(const char* file_name, const off_t fsize) {
   FILE* f = fopen(file_name, "r");
   if(f == NULL) {   return 1;   }       /* Fail if can't read file */ 
 
@@ -42,84 +42,82 @@ u_int32_t last_four(const char* file_name, const off_t fsize) {
 }
 
 void delete_tree(HN* n) {
+  /* BASE CASE */
   if(n == NULL) { return; }
-
+  /* Post-order Traversal */
   delete_tree(n->ptrs[0]);
   delete_tree(n->ptrs[1]);
-
+  /* Free all memory */
   if(n->strings[0] != NULL) { free(n->strings[0]); }
   if(n->strings[1] != NULL) { free(n->strings[1]); }
   free(n);
 }
 
 void print(HN* n) {
-  if(n->strings[0] != NULL) {
-    printf("0:%8s\n", n->strings[0]);
-  }
-  if(n->strings[1] != NULL) {
-    printf("0:%8s\n", n->strings[1]);
-  }
+  /* Print Children */
+  if(n->strings[0] != NULL) { printf("0:%8s\n", n->strings[0]); }
+  else { printf("0:    NULL\n"); }
+  if(n->strings[1] != NULL) { printf("1:%8s\n", n->strings[1]); }
+  else { printf("1:    NULL\n"); }
+  printf("\n");
 
+  /* Pre-Order Traversal */
   if(n->ptrs[0] != NULL) { print(n->ptrs[0]); }
   if(n->ptrs[1] != NULL) { print(n->ptrs[1]); }
 }
 
 char* read_string(const char* buff, int *curr, int *last) {
+  /* Continue until end of string */
   while(buff[*curr] != 0) {   (*curr)++;    }
-
+  /* Copy string over to str */
   int len = *curr - *last + 1;
-  char *s = (char*)malloc(len * sizeof(char));
-  snprintf(s, len, "%s", buff + *last);
+  char *str = (char*)malloc(len * sizeof(char));
+  snprintf(str, len, "%str", buff + *last);
 
-  return s;
+  return str;
 }
 
 void add_to_tree(HN* head, char* str, const char* buff, int* curr) {
-  // HN* last_hn = *head;
-  int reading = buff[*curr]-48;
-  // printf("%d ", reading);
+  HN* prev_HN = head;
+  int old_bit = buff[*curr]-48;       /* Read first bit and move to next bit */
   (*curr)++;
 
-  while(buff[*curr] != 0) {
-    /*
-    HN* child = last_hn->ptrs[reading];
-    if(child == NULL) { child = create_hn(); }
-    last_hn = child; 
-    */
-    reading = buff[*curr]-48;
-    // printf("%d ", reading);
+  while(buff[*curr] != 0) {           /* Read subsequential bits into tree after first bit */
+    int new_bit = buff[*curr]-48;
+    /* Create HN child based on last bit if NULL */
+    if(prev_HN->ptrs[old_bit] == NULL) {
+      prev_HN->ptrs[old_bit] = create_hn();
+    }
+    /* Move HN down tree and update new bit */
+    prev_HN = prev_HN->ptrs[old_bit];
+    old_bit = new_bit;
     (*curr)++;
   }
 
-  // last_hn->strings[reading] = str;
-  // printf("%s\n", last_hn->strings[reading]);
-  // printf("\n");
-
+  prev_HN->strings[old_bit] = str;    /* Set string to be str; */
 }
 
 int open_code_file(const char* file_name, const off_t fsize, HN* head) {
-  FILE* f = fopen(file_name, "rb");  // Open in binary mode to avoid issues with line endings
+  /* Open in binary mode to avoid issues with line endings */
+  FILE* f = fopen(file_name, "rb");
   if (f == NULL) {   return 1;   }
+  /* Read in file into char array */
   char buff[fsize];
   int nobjects;
   
-  HN *tmp = head;
   while ((nobjects = fread(buff, 1, sizeof(buff), f)) > 0) {
     int curr_index = 0;
     int last_index = 0;
 
+    /* Read in whole file as a string */
     while(curr_index < nobjects) {
-      char* s = read_string(buff, &curr_index, &last_index);    /* Read string */
-      last_index = ++curr_index;
-      // printf("string: %s \n", s);
+      /* Read string */
+      char* str = read_string(buff, &curr_index, &last_index);
+      last_index = ++curr_index;    /* Update index */
 
-      if(tmp->ptrs[0] == NULL) {
-        tmp->ptrs[0] = create_hn();
-      }
-      tmp->ptrs[0]->strings[0] = s;
-      tmp = tmp->ptrs[0];
-      add_to_tree(head, s, buff, &curr_index);               /* Read Sequence of bits */
-      last_index = ++curr_index;
+      /* Read Sequence of bits */
+      add_to_tree(head, str, buff, &curr_index);
+      last_index = ++curr_index;    /* Update index */
     }
   }
 
@@ -128,28 +126,23 @@ int open_code_file(const char* file_name, const off_t fsize, HN* head) {
 }
 
 int main(int argc, char** argv) {
-  off_t file_size = get_file_size(argv[1]);
-  if(file_size == -1) {                             /* Return 1 if error reading file */
+  off_t error = get_fsize(argv[1]);
+  if(error == -1) {
     perror(argv[1]);
     return 1;
   }
 
-  /*
-  HN* test = create_hn();
-  char* name = malloc(6 * sizeof(char));
-  strcpy(name, "Larry");
-  test->strings[0] = name;
-  // print(test);
-  free(test);
-  free(name);
-  */
-
+  off_t file_size = error;
   HN* head = create_hn();
-  open_code_file(argv[1], file_size, head);
-  print(head);
+  error = open_code_file(argv[1], file_size, head);
+  if(error == -1) {
+    perror(argv[1]);
+    return 1;
+  }
 
-  // printf("%10lld - %s\n", file_size, argv[1]);
-  // int nbits = last_four(argv[1], file_size);
+  print(head);
+  // printf("%10lld - %str\n", file_size, argv[1]);
+  // int nbits = four_bits(argv[1], file_size);
   // printf("number of bits:  %d\n", nbits);
 
   delete_tree(head);
