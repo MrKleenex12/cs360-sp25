@@ -74,10 +74,10 @@ char* read_string(const char* buff, int *curr, int *last) {
   return s;
 }
 
-void add_to_tree(HN** head, char* str, const char* buff, int* curr) {
+void add_to_tree(HN* head, char* str, const char* buff, int* curr) {
   // HN* last_hn = *head;
   int reading = buff[*curr]-48;
-  printf("%d ", reading);
+  // printf("%d ", reading);
   (*curr)++;
 
   while(buff[*curr] != 0) {
@@ -87,22 +87,23 @@ void add_to_tree(HN** head, char* str, const char* buff, int* curr) {
     last_hn = child; 
     */
     reading = buff[*curr]-48;
-    printf("%d ", reading);
+    // printf("%d ", reading);
     (*curr)++;
   }
 
   // last_hn->strings[reading] = str;
   // printf("%s\n", last_hn->strings[reading]);
-  printf("\n");
+  // printf("\n");
 
 }
 
-int open_code_file(const char* file_name, const off_t fsize, HN** head) {
+int open_code_file(const char* file_name, const off_t fsize, HN* head) {
   FILE* f = fopen(file_name, "rb");  // Open in binary mode to avoid issues with line endings
   if (f == NULL) {   return 1;   }
   char buff[fsize];
   int nobjects;
   
+  HN *tmp = head;
   while ((nobjects = fread(buff, 1, sizeof(buff), f)) > 0) {
     int curr_index = 0;
     int last_index = 0;
@@ -110,7 +111,13 @@ int open_code_file(const char* file_name, const off_t fsize, HN** head) {
     while(curr_index < nobjects) {
       char* s = read_string(buff, &curr_index, &last_index);    /* Read string */
       last_index = ++curr_index;
-      printf("string: %s \n", s);
+      // printf("string: %s \n", s);
+
+      if(tmp->ptrs[0] == NULL) {
+        tmp->ptrs[0] = create_hn();
+      }
+      tmp->ptrs[0]->strings[0] = s;
+      tmp = tmp->ptrs[0];
       add_to_tree(head, s, buff, &curr_index);               /* Read Sequence of bits */
       last_index = ++curr_index;
     }
@@ -138,7 +145,7 @@ int main(int argc, char** argv) {
   */
 
   HN* head = create_hn();
-  open_code_file(argv[1], file_size, &head);
+  open_code_file(argv[1], file_size, head);
   print(head);
 
   // printf("%10lld - %s\n", file_size, argv[1]);
