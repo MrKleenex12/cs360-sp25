@@ -25,20 +25,21 @@ off_t get_fsize(const char* file_name) {
   if(stat(file_name, &st) >= 0) { return st.st_size; }
   else {
     perror(file_name);
-    exit(1);
+    return -1;
   }
+  return 0;
 }
 
 /* last 4 bytes indicate how many bits should be read */
 u_int32_t four_bits(const char* file_name, const off_t fsize) {
   FILE* f = fopen(file_name, "r");
-  if(f == NULL) {   return 1;   }       /* Fail if can't read file */ 
+  if(f == NULL) { return -1; }       /* Fail if can't read file */ 
 
   u_int32_t nbits; 
   fseek(f, fsize-4, SEEK_SET);
   if(fread(&nbits, 4, 1, f) != 1) { /* Return 1 if can't read 4 bytes into one int*/
     fprintf(stderr, "Failed to read 4 bytes\n");
-    return 1;
+    return -1;
   }
   fclose(f);
   return nbits;
@@ -141,7 +142,7 @@ char* decrypt_file(const char* file_name, const off_t fsize, const int nbits) {
   int fd = open(file_name, O_RDONLY);
   if (fd == -1) {
     perror("Error opening file");
-    exit(1);
+    return NULL;
   }
 
   char buff[fsize];  // Read in chunks
@@ -190,7 +191,9 @@ int main(int argc, char** argv) {
 
   /* File size of encrypted file */
   off_t file_size =  get_fsize(argv[2]);            /* File size of encrypted file */
+  if(file_size == -1) { return 1; }
   int nbits = four_bits(argv[2], file_size);
+  if(nbits == -1) { return 1; }
 
   file_size =  get_fsize(argv[1]);                  /* File size of code definition file */
   HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
@@ -202,9 +205,13 @@ int main(int argc, char** argv) {
   }
 
   char* bit_stream = decrypt_file(argv[2], file_size, nbits);
+  if(bit_stream == NULL) {
+    delete_tree(head);
+    return 1;
+  }
+
   output(head, bit_stream);
-
-
+  
   free(bit_stream);
   delete_tree(head);
   return 0;
