@@ -21,24 +21,24 @@ HN* create_hn() {
   return hn;
 }
 
-LL get_fsize(const char* file_name) {
+LL get_fsize(const int fd) {
   struct stat st;
-  if(stat(file_name, &st) >= 0) { return st.st_size; }
+  if(fstat(fd, &st) >= 0) { return st.st_size; }
   else { return -1; }
   return 0;
 }
 
 /* last 4 bytes indicate how many bits should be read */
-u_int32_t four_bits(const char* file_name, const LL fsize) {
-  FILE* f = fopen(file_name, "r");
-  if(f == NULL) { return 1; }       /* Fail if can't read file */ 
+u_int32_t four_bits(int fd, const LL fsize) {
+  // int fd = open(file_name, O_RDONLY);
+  // if(fd == -1) { return 1; }
 
-  u_int32_t nbits; 
-  fseek(f, fsize-4, SEEK_SET);
+  u_int32_t nbits = 0; 
+  lseek(fd, fsize-4, SEEK_SET);
   /* Return 1 if can't read 4 bytes into one int*/
-  if(fread(&nbits, 4, 1, f) != 1) { return 1; }
+  if(read(fd, &nbits, 4) != 4) { return 1; }
 
-  fclose(f);
+  close(fd);
   return nbits;
 }
 
@@ -190,8 +190,8 @@ int main(int argc, char** argv) {
   }  
 
   /* File size of code definition file */
-
-  LL code_size =  get_fsize(argv[1]);
+  int fd = open(argv[1], O_RDONLY);
+  LL code_size =  get_fsize(fd);
   if(code_size == -1) {
     perror(argv[1]);
     return 1;
@@ -201,14 +201,15 @@ int main(int argc, char** argv) {
   HN* head = open_code_file(argv[1], code_size);
 
   /* File size of input file */
-  LL input_size =  get_fsize(argv[2]);
+  int fd2 = open(argv[2], O_RDONLY);
+  LL input_size =  get_fsize(fd2);
   if(input_size < 4) {
     fprintf(stderr, "Error: file is not the correct size.\n");
     delete_tree(head);
     return 1;
   }
 
-  u_int32_t nbits = four_bits(argv[2], input_size);
+  u_int32_t nbits = four_bits(fd2, input_size);
   if(nbits == 1 || nbits == 0) { 
     delete_tree(head);
     return 1;
