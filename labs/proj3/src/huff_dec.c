@@ -121,25 +121,16 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
     while(curr_index < nobjects) {
       /* Read string */
       char* str = read_string(buff, &curr_index, &last_index);
-      last_index = ++curr_index;    /* Update index */
+      last_index = ++curr_index; 
       /* Read Sequence of bits */
       add_to_tree(head, str, buff, &curr_index);
-      last_index = ++curr_index;    /* Update index */
+      last_index = ++curr_index;
     }
   }
   close(fd);
   return head;
 }
 
-/*
-void binary(unsigned char c, char* str, const int bits) {
-  for(int i = 0; i < bits; i++) {
-    str[i] = (((c >> i) & 1) ? '1' : '0');
-  }
-
-  str[bits] = '\0';
-}
-*/
 HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
   for(int i = 0; i < bits; i++) {
     int bit = (((c >> i) & 1) ? 1 : 0);
@@ -203,6 +194,7 @@ int main(int argc, char** argv) {
     delete_tree(head);
     return 1;
   }
+  
   off_t nbits = four_bits(argv[2], file_size);
   if(nbits == -1 || nbits == 0) { 
     delete_tree(head);
@@ -210,7 +202,6 @@ int main(int argc, char** argv) {
   }
 
   int error = decrypt_file(argv[2], head, file_size, nbits);
-
   if(error == -1) {
     delete_tree(head);
     return 1;
