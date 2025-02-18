@@ -107,7 +107,10 @@ void add_to_tree(HN* head, char* str, const char* buff, ST* curr, ST* last) {
 HN* open_code_file(const char* file_name, const LL fsize) {
   /* Error Check: Code definition file */
   int fd = open(file_name, O_RDONLY);
-  if (fd == -1) { return NULL; }
+  if (fd == -1) {
+    close(fd);
+    exit(1);
+  }
 
   HN* head = create_hn();
   char buff[fsize];   /* Read in file into char array */
@@ -127,29 +130,27 @@ HN* open_code_file(const char* file_name, const LL fsize) {
   return head;
 }
 
-HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
+void binary(HN** hn, HN* head, unsigned char c, const int bits) {
+  /* Index through specified number of bits */
   for(int i = 0; i < bits; i++) {
-    /* Calculate bit */
-    u_int8_t bit = (((c >> i) & 1) ? 1 : 0);
+    u_int8_t bit = (((c >> i) & 1) ? 1 : 0); /* Calculate bit */
 
     /* Check for matching sequence */
-    if(hn->strings[bit] == NULL) {
+    if((*hn)->strings[bit] == NULL) {
       /* Makes sure child exists and valid string */
-      if(hn->ptrs[bit] != NULL) {
-        hn = hn->ptrs[bit];
+      if((*hn)->ptrs[bit] != NULL) {
+        (*hn) = (*hn)->ptrs[bit];
         continue;
+      } else {  /* Error Message */
+        fprintf(stderr, "Unrecognized bits\n");
+        delete_tree(head);
+        exit(1);
       }
-      /* Error Message */
-      fprintf(stderr, "Unrecognized bits\n");
-      delete_tree(head);
-      exit(1);
     }
     /* print & reset once found an empty string */
-    printf("%s", hn->strings[bit]);
-    hn = head;
+    printf("%s", (*hn)->strings[bit]);
+    (*hn) = head;
   }
-
-  return hn;
 }
 
 void decrypt_file(const char* file_name, HN* head, const LL fsize, const LL nbits) {
@@ -176,10 +177,10 @@ void decrypt_file(const char* file_name, HN* head, const LL fsize, const LL nbit
     ST i;
     /* Print out strings based off bits */
     for(i = 0; i < times; i++) {
-      index = binary(index, head, buff[i], 8);
+      binary(&index, head, buff[i], 8);
     }
     if(nbits % 8 != 0) { 
-      index = binary(index, head, buff[i], nbits%8);
+      binary(&index, head, buff[i], nbits%8);
     }
   }
 
@@ -202,10 +203,6 @@ int main(int argc, char** argv) {
 
   /* Read in code definition file */
   HN* head = open_code_file(argv[1], file_size);
-  if(head == NULL) {
-    perror("Error opening file");
-    return 1;
-  }
 
   /* File size of input file */
   file_size =  get_fsize(argv[2]);
