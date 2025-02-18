@@ -153,7 +153,7 @@ void binary(HN** hn, HN* head, unsigned char c, const int bits) {
   }
 }
 
-void decrypt_file(const char* file_name, HN* head, const LL fsize, const LL nbits) {
+void output(const char* file_name, HN* head, const LL fsize, const LL nbits) {
   /* Check if open File*/
   int fd = open(file_name, O_RDONLY);
   if (fd == -1) {
@@ -195,30 +195,30 @@ int main(int argc, char** argv) {
   }  
 
   /* File size of code definition file */
-  LL file_size =  get_fsize(argv[1]);
-  if(file_size == -1) {
+  LL code_size =  get_fsize(argv[1]);
+  if(code_size == -1) {
     perror(argv[1]);
     return 1;
   }
 
   /* Read in code definition file */
-  HN* head = open_code_file(argv[1], file_size);
+  HN* head = open_code_file(argv[1], code_size);
 
   /* File size of input file */
-  file_size =  get_fsize(argv[2]);
-  if(file_size < 4) {
+  LL input_size =  get_fsize(argv[2]);
+  if(input_size < 4) {
     fprintf(stderr, "Error: file is not the correct size.\n");
     delete_tree(head);
     return 1;
   }
 
-  LL nbits = four_bits(argv[2], file_size);
+  LL nbits = four_bits(argv[2], input_size);
   if(nbits == -1 || nbits == 0) { 
     delete_tree(head);
     return 1;
   }
 
-  decrypt_file(argv[2], head, file_size, nbits);
+  output(argv[2], head, input_size, nbits);
 
   delete_tree(head);
   return 0;
