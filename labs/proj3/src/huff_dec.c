@@ -194,6 +194,7 @@ int main(int argc, char** argv) {
   LL code_size =  get_fsize(fd);
   if(code_size == -1) {
     perror(argv[1]);
+    close(fd);
     return 1;
   }
 
@@ -212,11 +213,14 @@ int main(int argc, char** argv) {
   u_int32_t nbits = four_bits(fd2, input_size);
   if(nbits == 1 || nbits == 0) { 
     delete_tree(head);
+    close(fd2);
     return 1;
   }
 
   output(argv[2], head, input_size, nbits);
-
+  
+  close(fd);
+  close(fd2);
   delete_tree(head);
   return 0;
 }
