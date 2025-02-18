@@ -16,7 +16,6 @@ HN* create_hn() {
   hn->ptrs[1] = NULL;
   hn->strings[0] = NULL;
   hn->strings[1] = NULL;
-
   return hn;
 }
 
@@ -68,26 +67,26 @@ void print(HN* n) {
   if(n->ptrs[1] != NULL) { print(n->ptrs[1]); }
 }
 
-char* read_string(const char* buff, int *curr, int *last) {
+char* read_string(const char* buff, size_t *curr, size_t *last) {
   /* Continue until end of string */
   while(buff[*curr] != 0) {
     (*curr)++;
   }
   /* Copy string over to str */
-  int len = *curr - *last + 1;
+  size_t len = *curr - *last + 1;
   char *str = (char*)malloc(len * sizeof(char));
   snprintf(str, len, "%s", buff + *last);
 
   return str;
 }
 
-void add_to_tree(HN* head, char* str, const char* buff, int* curr) {
+void add_to_tree(HN* head, char* str, const char* buff, size_t* curr) {
   HN* prev_HN = head;
-  int old_bit = buff[*curr]-48;       /* Read first bit and move to next bit */
+  uint8_t old_bit = buff[*curr]-48;       /* Read first bit and move to next bit */
   (*curr)++;
 
   while(buff[*curr] != 0) {           /* Read subsequential bits into tree after first bit */
-    int new_bit = buff[*curr]-48;
+    uint8_t new_bit = buff[*curr]-48;
     /* Create HN child based on last bit if NULL */
     if(prev_HN->ptrs[old_bit] == NULL) {
       prev_HN->ptrs[old_bit] = create_hn();
@@ -111,11 +110,11 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
 
   HN* head = create_hn();           /* Head of tree pointer */
   char buff[fsize];                 /* Read in file into char array */
-  int nobjects;                     /* Helper variable to read in file */
+  size_t nobjects;                     /* Helper variable to read in file */
   
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
-    int curr_index = 0;
-    int last_index = 0;
+    size_t curr_index = 0;
+    size_t last_index = 0;
     /* Read in whole file as a string */
     while(curr_index < nobjects) {
       /* Read string */
@@ -132,7 +131,7 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
 
 HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
   for(int i = 0; i < bits; i++) {
-    int bit = (((c >> i) & 1) ? 1 : 0);
+    uint8_t bit = (((c >> i) & 1) ? 1 : 0);
 
     if(hn->strings[bit] == NULL) {
       if(hn->ptrs[bit] == NULL) {
@@ -140,7 +139,7 @@ HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
         delete_tree(head);
         exit(1);
       }
-      
+
       hn = hn->ptrs[bit];
       continue;
     }
@@ -191,11 +190,11 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Usage: ./bin/huff_def code_def_file intput\n");
     return 1;
   }  
-
-
-  off_t file_size =  get_fsize(argv[1]);                  /* File size of code definition file */
+  /* File size of code definition file */
+  off_t file_size =  get_fsize(argv[1]);
   if(file_size == -1) { return 1; }
-  HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
+  /* Read in code definition file */
+  HN* head = open_code_file(argv[1], file_size);
 
   /* File size of encrypted file */
   file_size =  get_fsize(argv[2]);
