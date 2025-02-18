@@ -140,8 +140,7 @@ void binary(unsigned char c, char* str, const int bits) {
   str[bits] = '\0';
 }
 */
-HN* binary(HN** index, HN* head, unsigned char c, const int bits) {
-  HN* hn = *index; 
+HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
   for(int i = 0; i < bits; i++) {
     int bit = (((c >> i) & 1) ? 1 : 0);
 
@@ -167,20 +166,19 @@ int decrypt_file(const char* file_name, HN* head, const off_t fsize, const off_t
     fprintf(stderr, "Error: Total bits = %ld, but file's size is %ld\n", nbits, fsize);
     return -1;
   }
-
-  char buff[2*fsize];  // Read in chunks
+  /* Read in file into buffer */
+  char buff[2*fsize];  
   int nobjects;
-  /* Alloc memory for string of bit stream */
 
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
     HN* index = head;
     int times = nbits / 8;
     int i;
-    for(i = 0; i < times; i++) {
-      binary(&index, head, buff[i], 8);
-    }
-    if(nbits % 8 != 0) { binary(&index, head, buff[i], nbits%8); }
+    /* Print out strings based off bits */
+    for(i = 0; i < times; i++) { index = binary(index, head, buff[i], 8); }
+    if(nbits % 8 != 0) { binary(index, head, buff[i], nbits%8); }
   }
+
   close(fd);
   return 0;
 }
