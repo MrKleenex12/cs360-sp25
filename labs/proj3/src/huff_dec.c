@@ -31,12 +31,12 @@ LL get_fsize(const char* file_name) {
 /* last 4 bytes indicate how many bits should be read */
 u_int32_t four_bits(const char* file_name, const LL fsize) {
   FILE* f = fopen(file_name, "r");
-  if(f == NULL) { return -1; }       /* Fail if can't read file */ 
+  if(f == NULL) { return 1; }       /* Fail if can't read file */ 
 
   u_int32_t nbits; 
   fseek(f, fsize-4, SEEK_SET);
   /* Return 1 if can't read 4 bytes into one int*/
-  if(fread(&nbits, 4, 1, f) != 1) { return -1; }
+  if(fread(&nbits, 4, 1, f) != 1) { return 1; }
 
   fclose(f);
   return nbits;
@@ -136,20 +136,18 @@ void binary(HN** hn, HN* head, unsigned char c, const int bits) {
     u_int8_t bit = (((c >> i) & 1) ? 1 : 0); /* Calculate bit */
 
     /* Check for matching sequence */
-    if((*hn)->strings[bit] == NULL) {
-      /* Makes sure child exists and valid string */
-      if((*hn)->ptrs[bit] != NULL) {
-        (*hn) = (*hn)->ptrs[bit];
-        continue;
-      } else {  /* Error Message */
-        fprintf(stderr, "Unrecognized bits\n");
-        delete_tree(head);
-        exit(1);
-      }
+    if((*hn)->strings[bit]) {
+      /* print & reset once found an empty string */
+      printf("%s", (*hn)->strings[bit]);
+      (*hn) = head;
+    } else if ((*hn)->ptrs[bit]) {
+      (*hn) = (*hn)->ptrs[bit];
+    } else {
+      /* Error Message */
+      fprintf(stderr, "Unrecognized bits\n");
+      delete_tree(head);
+      exit(1);
     }
-    /* print & reset once found an empty string */
-    printf("%s", (*hn)->strings[bit]);
-    (*hn) = head;
   }
 }
 
@@ -175,13 +173,10 @@ void output(const char* file_name, HN* head, const LL fsize, const LL nbits) {
     HN* index = head;
     ST times = nbits / 8;
     ST i;
-    /* Print out strings based off bits */
-    for(i = 0; i < times; i++) {
-      binary(&index, head, buff[i], 8);
-    }
-    if(nbits % 8 != 0) { 
-      binary(&index, head, buff[i], nbits%8);
-    }
+    /* Print out strings by reading 8 bits at a time */
+    for(i = 0; i < times; i++) { binary(&index, head, buff[i], 8); }
+    /* Print out remainder of bits if needed */
+    if(nbits % 8 != 0) {  binary(&index, head, buff[i], nbits%8); }
   }
 
   close(fd);
@@ -195,6 +190,7 @@ int main(int argc, char** argv) {
   }  
 
   /* File size of code definition file */
+
   LL code_size =  get_fsize(argv[1]);
   if(code_size == -1) {
     perror(argv[1]);
@@ -212,8 +208,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  LL nbits = four_bits(argv[2], input_size);
-  if(nbits == -1 || nbits == 0) { 
+  u_int32_t nbits = four_bits(argv[2], input_size);
+  if(nbits == 1 || nbits == 0) { 
     delete_tree(head);
     return 1;
   }
