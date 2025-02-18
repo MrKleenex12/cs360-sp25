@@ -134,13 +134,13 @@ HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
   for(int i = 0; i < bits; i++) {
     int bit = (((c >> i) & 1) ? 1 : 0);
 
-    if(hn->ptrs[bit] == NULL) {
-      fprintf(stderr, "Unrecognized bits\n");
-      delete_tree(head);
-      exit(1);
-    }
-    
     if(hn->strings[bit] == NULL) {
+      if(hn->ptrs[bit] == NULL) {
+        fprintf(stderr, "Unrecognized bits\n");
+        delete_tree(head);
+        exit(1);
+      }
+      
       hn = hn->ptrs[bit];
       continue;
     }
