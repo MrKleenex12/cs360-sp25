@@ -82,11 +82,11 @@ char* read_string(const char* buff, size_t *curr, size_t *last) {
 
 void add_to_tree(HN* head, char* str, const char* buff, size_t* curr) {
   HN* prev_HN = head;
-  uint8_t old_bit = buff[*curr]-48;       /* Read first bit and move to next bit */
+  u_int8_t old_bit = buff[*curr]-48;       /* Read first bit and move to next bit */
   (*curr)++;
 
   while(buff[*curr] != 0) {           /* Read subsequential bits into tree after first bit */
-    uint8_t new_bit = buff[*curr]-48;
+    u_int8_t new_bit = buff[*curr]-48;
     /* Create HN child based on last bit if NULL */
     if(prev_HN->ptrs[old_bit] == NULL) {
       prev_HN->ptrs[old_bit] = create_hn();
@@ -131,7 +131,7 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
 
 HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
   for(int i = 0; i < bits; i++) {
-    uint8_t bit = (((c >> i) & 1) ? 1 : 0);
+    u_int8_t bit = (((c >> i) & 1) ? 1 : 0);
 
     if(hn->strings[bit] == NULL) {
       if(hn->ptrs[bit] == NULL) {
