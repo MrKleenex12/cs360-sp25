@@ -37,9 +37,8 @@ u_int32_t four_bits(const char* file_name, const off_t fsize) {
 
   u_int32_t nbits; 
   fseek(f, fsize-4, SEEK_SET);
-  if(fread(&nbits, 4, 1, f) != 1) { /* Return 1 if can't read 4 bytes into one int*/
-    return -1;
-  }
+  /* Return 1 if can't read 4 bytes into one int*/
+  if(fread(&nbits, 4, 1, f) != 1) { return -1; }
   fclose(f);
   return nbits;
 }
@@ -111,7 +110,7 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
   }
 
   HN* head = create_hn();           /* Head of tree pointer */
-  char buff[fsize];               /* Read in file into char array */
+  char buff[fsize];                 /* Read in file into char array */
   int nobjects;                     /* Helper variable to read in file */
   
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
@@ -134,8 +133,14 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
 HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
   for(int i = 0; i < bits; i++) {
     int bit = (((c >> i) & 1) ? 1 : 0);
+
+    if(hn->ptrs[bit] == NULL) {
+      fprintf(stderr, "Unrecognized bits\n");
+      delete_tree(head);
+      exit(1);
+    }
+    
     if(hn->strings[bit] == NULL) {
-      if(hn->ptrs[bit] == NULL) { return NULL; }
       hn = hn->ptrs[bit];
       continue;
     }
