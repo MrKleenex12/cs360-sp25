@@ -111,7 +111,7 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
   }
 
   HN* head = create_hn();           /* Head of tree pointer */
-  char buff[2*fsize];               /* Read in file into char array */
+  char buff[fsize];               /* Read in file into char array */
   int nobjects;                     /* Helper variable to read in file */
   
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
@@ -158,7 +158,7 @@ int decrypt_file(const char* file_name, HN* head, const off_t fsize, const off_t
     return -1;
   }
   /* Read in file into buffer */
-  char buff[2*fsize];  
+  char buff[fsize];  
   int nobjects;
 
   if ((nobjects = read(fd, buff, sizeof(buff))) > 0) {
@@ -181,20 +181,19 @@ int main(int argc, char** argv) {
     return 1;
   }  
 
-  /* File size of encrypted file */
-  off_t file_size =  get_fsize(argv[2]);            /* File size of encrypted file */
-  if(file_size == -1) { return 1; }
 
-  file_size =  get_fsize(argv[1]);                  /* File size of code definition file */
+  off_t file_size =  get_fsize(argv[1]);                  /* File size of code definition file */
+  if(file_size == -1) { return 1; }
   HN* head = open_code_file(argv[1], file_size);    /* Read in code definition file */
 
+  /* File size of encrypted file */
   file_size =  get_fsize(argv[2]);
   if(file_size < 4) {
     fprintf(stderr, "Error: file is not the correct size.\n");
     delete_tree(head);
     return 1;
   }
-  
+
   off_t nbits = four_bits(argv[2], file_size);
   if(nbits == -1 || nbits == 0) { 
     delete_tree(head);
