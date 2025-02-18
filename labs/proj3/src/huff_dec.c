@@ -134,8 +134,8 @@ HN* open_code_file(const char* file_name, const off_t fsize) {
 HN* binary(HN* hn, HN* head, unsigned char c, const int bits) {
   for(int i = 0; i < bits; i++) {
     int bit = (((c >> i) & 1) ? 1 : 0);
-
     if(hn->strings[bit] == NULL) {
+      if(hn->ptrs[bit] == NULL) { return NULL; }
       hn = hn->ptrs[bit];
       continue;
     }
@@ -166,8 +166,14 @@ int decrypt_file(const char* file_name, HN* head, const off_t fsize, const off_t
     int times = nbits / 8;
     int i;
     /* Print out strings based off bits */
-    for(i = 0; i < times; i++) { index = binary(index, head, buff[i], 8); }
-    if(nbits % 8 != 0) { binary(index, head, buff[i], nbits%8); }
+    for(i = 0; i < times; i++) {
+      index = binary(index, head, buff[i], 8);
+      if(!index) { return -1; }
+    }
+    if(nbits % 8 != 0) { 
+      index = binary(index, head, buff[i], nbits%8);
+      if(!index) { return -1; } 
+    }
   }
 
   close(fd);
