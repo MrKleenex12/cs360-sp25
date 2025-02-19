@@ -1,4 +1,7 @@
+bin/*
+!bin/.keep
 .vscode
-index.html
 grade*
+index.html
 *.o
+mysort
