@@ -1,12 +1,14 @@
-include = -I ~/VScode/school/cs360-sp25/include
-lib = ~/VScode/school/cs360-sp25/lib
+CC = gcc
+INCLUDES = -I ~/VScode/school/cs360-sp25/include
+CFLAGS = $(INCLUDES) -g -fsanitize=address, undefined
+LIB = ~/VScode/school/cs360-sp25/lib/libfdr.a
 
-EXECUTABLES: fakemake
+EXECUTABLES = bin/fakemake
 
 all: $(EXECUTABLES) 
 
-fakemake: fakemake.c
-	gcc -g $(include) -o fakemake  fakemake.c $(lib)/libfdr.a
+bin/fakemake: src/fakemake.c
+	gcc $(INCLUDES) -o $@ $^ $(LIB)
 
 clean:
 	rm $(EXECUTABLES) 
