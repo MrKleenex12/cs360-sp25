@@ -3,3 +3,4 @@ bin/*
 .vscode
 grade*
 index.html
+makefile
