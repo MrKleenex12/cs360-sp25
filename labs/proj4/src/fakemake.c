@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "No Executable Found.\n");
     rm_make(m);
     jettison_inputstruct(is);
+    return 1;
   } else {
     printf("%s\n", m->exectuable);
     printf("C:%d F:%d H:%d L:%d\n", m->C, m->F, m->H, m->L);
