@@ -3,28 +3,49 @@
 #include <string.h>
 #include "fields.h"
 #include "dllist.h"
+#include "jval.h"
 
 typedef struct makefile {
-  int C, F, H, L;
+  Dllist C, H, F, L;
   char* exectuable;
 } makefile;
 
-makefile* create_make(makefile *def) {
+makefile* create_make() {
   /* Take struct with default values and set makefile pointer to them */
   makefile *m = (makefile*)malloc(sizeof(makefile));  
-  *m = *def;
+  m->C = new_dllist();
+  m->H = new_dllist();
+  m->F = new_dllist();
+  m->L = new_dllist();
   return m;
+}
+
+void print(makefile *m) {
+  printf("Executable: %s\n", m->exectuable);
+  Dllist tmp;
+  dll_traverse(tmp, m->C) { printf("%s ", tmp->val.s); }
+  printf("\n");
+  dll_traverse(tmp, m->H) { printf("%s ", tmp->val.s); }
+  printf("\n");
+  dll_traverse(tmp, m->F) { printf("%s ", tmp->val.s); }
+  printf("\n");
+  dll_traverse(tmp, m->L) { printf("%s ", tmp->val.s); }
+  printf("\n");
 }
 
 void rm_make(makefile *m) {
   if(m->exectuable != NULL) {
     free(m->exectuable);
   }
+  free_dllist(m->C);
+  free_dllist(m->H);
+  free_dllist(m->F);
+  free_dllist(m->L);
   free(m);
 }
 
-makefile* read_file(makefile *def, IS is, unsigned char *foundE) {
-  makefile *m = create_make(def);
+makefile* read_file(IS is, unsigned char *foundE) {
+  makefile *m = create_make();
 
   /* Read files */
   while(get_line(is) >= 0) {
@@ -35,13 +56,21 @@ makefile* read_file(makefile *def, IS is, unsigned char *foundE) {
 
     /* Reading in Lines based off first character */
     if(strcmp(is->fields[0], "C") == 0) {         /* Source files */
-      (m->C)++;
+      for(int i = 1; i < is->NF; i++) {
+        dll_append(m->C, new_jval_s(strdup(is->fields[i])));
+      }
     } else if(strcmp(is->fields[0], "H") == 0) {  /* Header files */
-      (m->H)++;
+      for(int i = 1; i < is->NF; i++) {
+        dll_append(m->H, new_jval_s(strdup(is->fields[i])));
+      }
     } else if(strcmp(is->fields[0], "F") == 0) {  /* Flags */
-      (m->F)++;
+      for(int i = 1; i < is->NF; i++) {
+        dll_append(m->F, new_jval_s(strdup(is->fields[i])));
+      }
     } else if(strcmp(is->fields[0], "L") == 0) {  /* Libraries */
-      (m->L)++;
+      for(int i = 1; i < is->NF; i++) {
+        dll_append(m->L, new_jval_s(strdup(is->fields[i])));
+      }
     } else if(strcmp(is->fields[0], "E") == 0) {  /* Executable name */
       *foundE = 1;
       m->exectuable = strdup(is->fields[1]);
@@ -59,8 +88,7 @@ int main(int argc, char **argv) {
   }
   
   unsigned char foundE = 0;
-  makefile def = {0, 0, 0, 0, NULL};
-  makefile *m = read_file(&def, is, &foundE);
+  makefile *m = read_file(is, &foundE);
 
   /* Check if executable was in file*/
   if(foundE == 0) {
@@ -69,8 +97,7 @@ int main(int argc, char **argv) {
     jettison_inputstruct(is);
     return 1;
   } else {
-    printf("%s\n", m->exectuable);
-    printf("C:%d F:%d H:%d L:%d\n", m->C, m->F, m->H, m->L);
+    print(m);
   }
 
   rm_make(m);
