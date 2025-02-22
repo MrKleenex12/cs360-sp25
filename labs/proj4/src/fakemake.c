@@ -49,30 +49,28 @@ void rm_make(makefile *m) {
 
 makefile* read_file(IS is, unsigned char *foundE) {
   makefile *m = create_make();
+  Dllist tmp;
   /* Read descriptor file */
   while(get_line(is) >= 0) {
     if(is->NF == 0) { continue; }                 /* Skip if blank line */
 
-    /* Reading in Lines based off first character */
-    if(strcmp(is->fields[0], "C") == 0) {         /* Source files */
-      for(int i = 1; i < is->NF; i++) {
-        dll_append(m->C, new_jval_s(strdup(is->fields[i])));
-      }
-    } else if(strcmp(is->fields[0], "H") == 0) {  /* Header files */
-      for(int i = 1; i < is->NF; i++) {
-        dll_append(m->H, new_jval_s(strdup(is->fields[i])));
-      }
-    } else if(strcmp(is->fields[0], "F") == 0) {  /* Flags */
-      for(int i = 1; i < is->NF; i++) {
-        dll_append(m->F, new_jval_s(strdup(is->fields[i])));
-      }
-    } else if(strcmp(is->fields[0], "L") == 0) {  /* Libraries */
-      for(int i = 1; i < is->NF; i++) {
-        dll_append(m->L, new_jval_s(strdup(is->fields[i])));
-      }
-    } else if(strcmp(is->fields[0], "E") == 0) {  /* Executable name */
+    /* Source files */
+    if(strcmp(is->fields[0], "C") == 0) { tmp = m->C;}
+    /* Header files */
+    else if(strcmp(is->fields[0], "H") == 0) { tmp = m->H;}
+    /* Flags */
+    else if(strcmp(is->fields[0], "F") == 0) { tmp = m->F; }
+    /* Libraries */
+    else if(strcmp(is->fields[0], "L") == 0) { tmp = m->L;}
+    /* Executable name */
+    else if(strcmp(is->fields[0], "E") == 0) {
       *foundE = 1;
       m->exectuable = strdup(is->fields[1]);
+      continue;
+    }
+    /* Add files into corresponding Dllist */
+    for(int i = 1; i < is->NF; i++) {
+      dll_append(tmp, new_jval_s(strdup(is->fields[i])));
     }
   }
   return m;
