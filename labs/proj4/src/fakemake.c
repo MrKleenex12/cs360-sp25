@@ -9,59 +9,54 @@
 typedef unsigned long UL;
 
 typedef struct makefile {
-  Dllist C, H, F, L;
+  Dllist list[4];
+  /*  0 - C files
+      1 - Header files
+      2 - Flags
+      3 - Libraries */
   char* exectuable;
-} makefile;
+} MF;
 
-makefile* create_make() {
-  /* Take struct with default values and set makefile pointer to them */
-  makefile *m = (makefile*)malloc(sizeof(makefile));  
-  m->C = new_dllist();
-  m->H = new_dllist();
-  m->F = new_dllist();
-  m->L = new_dllist();
+MF* create_make() {
+  /* Take struct with default values and set MF pointer to them */
+  MF *m = (MF*)malloc(sizeof(MF));  
+  for(size_t i = 0; i < 4; i++) {
+    m->list[i] = new_dllist();
+  }
   return m;
 }
 
-void print(makefile *m) {
+void print(MF *m) {
   printf("Executable: %s\n", m->exectuable);
   Dllist tmp;
-  dll_traverse(tmp, m->C) { printf("%s ", tmp->val.s); }
-  printf("\n");
-  dll_traverse(tmp, m->H) { printf("%s ", tmp->val.s); }
-  printf("\n");
-  dll_traverse(tmp, m->F) { printf("%s ", tmp->val.s); }
-  printf("\n");
-  dll_traverse(tmp, m->L) { printf("%s ", tmp->val.s); }
-  printf("\n");
+  for(size_t i = 0; i < 4; i++) {
+    dll_traverse(tmp, m->list[i]) { printf("%s ", tmp->val.s); }
+    printf("\n");
+  }
 }
 
-void rm_make(makefile *m) {
-  if(m->exectuable != NULL) {
-    free(m->exectuable);
-  }
-  free_dllist(m->C);
-  free_dllist(m->H);
-  free_dllist(m->F);
-  free_dllist(m->L);
+void rm_make(MF *m) {
+  /* Free everything in a MF */
+  if(m->exectuable != NULL) { free(m->exectuable); }
+  for(size_t i = 0; i < 4; i++) { free_dllist(m->list[i]); }
   free(m);
 }
 
-makefile* read_file(IS is, unsigned char *foundE) {
-  makefile *m = create_make();
+MF* read_file(IS is, unsigned char *foundE) {
+  MF *m = create_make();
   Dllist tmp;
   /* Read descriptor file */
   while(get_line(is) >= 0) {
     if(is->NF == 0) { continue; }                 /* Skip if blank line */
 
     /* Source files */
-    if(strcmp(is->fields[0], "C") == 0) { tmp = m->C;}
+    if(strcmp(is->fields[0], "C") == 0) { tmp = m->list[0];}
     /* Header files */
-    else if(strcmp(is->fields[0], "H") == 0) { tmp = m->H;}
+    else if(strcmp(is->fields[0], "H") == 0) { tmp = m->list[1];}
     /* Flags */
-    else if(strcmp(is->fields[0], "F") == 0) { tmp = m->F; }
+    else if(strcmp(is->fields[0], "F") == 0) { tmp = m->list[2]; }
     /* Libraries */
-    else if(strcmp(is->fields[0], "L") == 0) { tmp = m->L;}
+    else if(strcmp(is->fields[0], "L") == 0) { tmp = m->list[3];}
     /* Executable name */
     else if(strcmp(is->fields[0], "E") == 0) {
       *foundE = 1;
@@ -98,11 +93,7 @@ char* ocopy(char *cfile) {
   ofile[strlen(ofile)-1] = 'o'; 
   return ofile;
 }
-/* TODO Process all C files
-    - Print out C file needs to be recompiled if:
-      - corresponding .o doesn't exist
-      - existing .o file is less than C file or htime 
-*/
+
 void sources(Dllist d, Dllist tmp, const UL *htime) {
   struct stat buf;
   UL ctime, otime;
@@ -141,7 +132,7 @@ int main(int argc, char **argv) {
   }
   
   unsigned char foundE = 0;
-  makefile *m = read_file(is, &foundE);
+  MF *m = read_file(is, &foundE);
   Dllist tmp;
   /* Check if executable was in file*/
   if(foundE == 0) {
@@ -152,9 +143,9 @@ int main(int argc, char **argv) {
   }
   
   // print(m);
-  UL htime = headers(m->H, tmp);
+  UL htime = headers(m->list[1], tmp);
   printf("max header time: %ld\n", htime);
-  sources(m->C, tmp, &htime);
+  sources(m->list[0], tmp, &htime);
 
 
   rm_make(m);
