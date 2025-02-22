@@ -35,10 +35,14 @@ void print(MF *m) {
   }
 }
 
-void rm_make(MF *m) {
+void rm_make(MF *m, Dllist tmp) {
   /* Free everything in a MF */
   if(m->exectuable != NULL) { free(m->exectuable); }
-  for(size_t i = 0; i < 4; i++) { free_dllist(m->list[i]); }
+  for(size_t i = 0; i < 4; i++) {
+    Dllist list = m->list[i];
+    dll_traverse(tmp, list) { free(tmp->val.s); }
+    free_dllist(list);
+  }
   free(m);
 }
 
@@ -137,7 +141,7 @@ int main(int argc, char **argv) {
   /* Check if executable was in file*/
   if(foundE == 0) {
     fprintf(stderr, "No Executable Found.\n");
-    rm_make(m);
+    rm_make(m, tmp);
     jettison_inputstruct(is);
     return 1;
   }
@@ -148,6 +152,6 @@ int main(int argc, char **argv) {
   sources(m->list[0], tmp, &htime);
 
 
-  rm_make(m);
+  rm_make(m, tmp);
   jettison_inputstruct(is);
 }
