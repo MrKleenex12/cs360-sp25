@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "fields.h"
 #include "dllist.h"
 #include "jval.h"
@@ -79,6 +80,22 @@ makefile* read_file(IS is, unsigned char *foundE) {
   return m;
 }
 
+/* TODO Process Header files */
+void headers(Dllist *d) {
+  Dllist tmp;  
+  struct stat buf;
+  int exists;
+
+  dll_traverse(tmp, (*d)) {
+    exists = stat(tmp->val.s, &buf);
+    if(exists < 0) {
+      fprintf(stderr, "%s not available,\n", tmp->val.s);
+      return;
+    }
+    printf("%15ld %s\n", buf.st_mtime, tmp->val.s);
+  }
+}
+
 int main(int argc, char **argv) {
   /* Reading in through argv or stdin */
   IS is = (argc == 2) ? new_inputstruct(argv[1]) : new_inputstruct(NULL);
@@ -96,9 +113,10 @@ int main(int argc, char **argv) {
     rm_make(m);
     jettison_inputstruct(is);
     return 1;
-  } else {
-    print(m);
   }
+  
+  print(m);
+  headers(&(m->H));
 
   rm_make(m);
   jettison_inputstruct(is);
