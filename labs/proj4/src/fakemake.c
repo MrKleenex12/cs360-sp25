@@ -80,20 +80,35 @@ makefile* read_file(IS is, unsigned char *foundE) {
   return m;
 }
 
-/* TODO Process Header files */
-void headers(Dllist *d) {
-  Dllist tmp;  
+long headers(Dllist d, Dllist tmp) {
   struct stat buf;
+  long htime = 0;
   int exists;
-
-  dll_traverse(tmp, (*d)) {
+  /* Find time of most recently modified header file */
+  dll_traverse(tmp, d) {
     exists = stat(tmp->val.s, &buf);
     if(exists < 0) {
       fprintf(stderr, "%s not available,\n", tmp->val.s);
-      return;
+      return -1;
     }
-    printf("%15ld %s\n", buf.st_mtime, tmp->val.s);
+    /* Check if max time */
+    if(buf.st_mtime > htime) { htime = buf.st_mtime; }
   }
+  return htime;
+}
+
+/* TODO Process all C files
+    - Print out C file needs to be recompiled if:
+      - corresponding .o doesn't exist
+      - existing .o file is less than C file or htime 
+*/
+void sources(Dllist d, Dllist tmp, const long *htime) {
+  struct stat buf;
+  /* Check which C files need to be recompiled */
+  dll_traverse(tmp, d) {
+    printf("%s ", tmp->val.s);
+  }
+  printf("\n");
 }
 
 int main(int argc, char **argv) {
@@ -106,7 +121,7 @@ int main(int argc, char **argv) {
   
   unsigned char foundE = 0;
   makefile *m = read_file(is, &foundE);
-
+  Dllist tmp;
   /* Check if executable was in file*/
   if(foundE == 0) {
     fprintf(stderr, "No Executable Found.\n");
@@ -116,7 +131,10 @@ int main(int argc, char **argv) {
   }
   
   print(m);
-  headers(&(m->H));
+  long htime = headers(m->H, tmp);
+  printf("max header time: %ld\n", htime);
+  sources(m->C, tmp, &htime);
+
 
   rm_make(m);
   jettison_inputstruct(is);
