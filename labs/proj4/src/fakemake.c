@@ -6,6 +6,8 @@
 #include "dllist.h"
 #include "jval.h"
 
+typedef unsigned long UL;
+
 typedef struct makefile {
   Dllist C, H, F, L;
   char* exectuable;
@@ -47,13 +49,9 @@ void rm_make(makefile *m) {
 
 makefile* read_file(IS is, unsigned char *foundE) {
   makefile *m = create_make();
-
-  /* Read files */
+  /* Read descriptor file */
   while(get_line(is) >= 0) {
-    /* Skip if blank line */
-    if(is->NF == 0) {
-      continue;
-    }
+    if(is->NF == 0) { continue; }                 /* Skip if blank line */
 
     /* Reading in Lines based off first character */
     if(strcmp(is->fields[0], "C") == 0) {         /* Source files */
@@ -80,9 +78,9 @@ makefile* read_file(IS is, unsigned char *foundE) {
   return m;
 }
 
-long headers(Dllist d, Dllist tmp) {
+UL headers(Dllist d, Dllist tmp) {
   struct stat buf;
-  long htime = 0;
+  UL htime = 0;
   int exists;
   /* Find time of most recently modified header file */
   dll_traverse(tmp, d) {
@@ -97,18 +95,43 @@ long headers(Dllist d, Dllist tmp) {
   return htime;
 }
 
+char* ocopy(char *cfile) {
+  char *ofile = strdup(cfile);
+  ofile[strlen(ofile)-1] = 'o'; 
+  return ofile;
+}
 /* TODO Process all C files
     - Print out C file needs to be recompiled if:
       - corresponding .o doesn't exist
       - existing .o file is less than C file or htime 
 */
-void sources(Dllist d, Dllist tmp, const long *htime) {
+void sources(Dllist d, Dllist tmp, const UL *htime) {
   struct stat buf;
-  /* Check which C files need to be recompiled */
+  UL ctime, otime;
+  int exists;
+  char *cfile, *ofile;
+
+  /* Check C files*/
   dll_traverse(tmp, d) {
-    printf("%s ", tmp->val.s);
+    cfile = tmp->val.s;
+    
+    /* Find time of C file */
+    exists = stat(cfile, &buf);
+    if(exists < 0) {
+      fprintf(stderr, "%s not available,\n", cfile);
+      return;
+    } else { ctime = buf.st_mtime; }
+    /* Stat .o file corresponding with C file */
+    ofile = ocopy(cfile);
+    exists = stat(ofile, &buf);
+    otime = buf.st_mtime;
+
+    /* Check if C file needs to be recompiled*/
+    if(exists < 0 || otime < ctime || otime < *htime) {
+      printf("%s needs to be recompiled.\n", tmp->val.s);
+    }
+    free(ofile);
   }
-  printf("\n");
 }
 
 int main(int argc, char **argv) {
@@ -130,8 +153,8 @@ int main(int argc, char **argv) {
     return 1;
   }
   
-  print(m);
-  long htime = headers(m->H, tmp);
+  // print(m);
+  UL htime = headers(m->H, tmp);
   printf("max header time: %ld\n", htime);
   sources(m->C, tmp, &htime);
 
