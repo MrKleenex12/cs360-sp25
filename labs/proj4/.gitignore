@@ -5,3 +5,6 @@ grade*
 index.html
 makefile
 lab-testing
+*.o
+mysort
+f
