@@ -166,14 +166,17 @@ char* base_call(Dllist flist, Dllist tmp, u_int32_t *len) {
 void compile_objs(MF *m, Dllist tmp) {
   u_int32_t len = 0;
   char *call = base_call(m->list[2], tmp, &len);
-  printf("%d - %s\n", len, call);
-  free(call);
-  /*
+  /* Call all files that need to be recompiled */
   dll_traverse(tmp, m->recompiled) {
-    char *c = tmp->val.s;
-    char *o = (char*)jrb_find_str(m->ctoo, c)->val.s;
+    /* Realloc space for call and create string */
+    call = realloc(call, len+2+strlen(tmp->val.s));
+    call[len] = ' ';
+    strcpy(call+len+1, tmp->val.s);
+    /* System call to make files */
+    system(call);
+    printf("%s\n", call);
   }
-  */
+  free(call);
 }
 
 int main(int argc, char **argv) {
