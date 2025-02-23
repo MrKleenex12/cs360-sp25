@@ -15,15 +15,17 @@ typedef struct makefile {
       1 - Header files
       2 - Flags
       3 - Libraries */
+  Dllist recompiled;  /* list of c files that need to be recompiled */
+  JRB ctoo;           /* c to object files JRB */
   char* exectuable;
 } MF;
 
 MF* create_make() {
   /* Malloc and set default values for MF */
   MF *m = (MF*)malloc(sizeof(MF));  
-  for(size_t i = 0; i < 4; i++) {
-    m->list[i] = new_dllist();
-  }
+  for(size_t i = 0; i < 4; i++) { m->list[i] = new_dllist(); }
+  m->recompiled = new_dllist();
+  m->ctoo = make_jrb();
   return m;
 }
 
@@ -36,13 +38,18 @@ void print(MF *m) {
   }
 }
 
+/* Free everything in a MF */
 void rm_make(MF *m, Dllist tmp) {
-  /* Free everything in a MF */
+  /* Free executable */
   if(m->exectuable != NULL) { free(m->exectuable); }
+  /* Free all file lists */
   for(size_t i = 0; i < 4; i++) {
     dll_traverse(tmp, m->list[i]) { free(tmp->val.s); }
     free_dllist(m->list[i]);
   }
+  /* Free other stuff */
+  free_dllist(m->recompiled);
+  jrb_free_tree(m->ctoo);
   free(m);
 }
 
@@ -103,44 +110,42 @@ char* ofile_copy(char *cfile) {
   return ofile;
 }
 
-Dllist sources(Dllist clist, Dllist tmp, JRB ctoo, const UL *htime) {
-  Dllist recompile = new_dllist();
+int sources(MF *m, Dllist tmp, const UL *htime) {
   struct stat buf;
   UL ctime, otime;
   int exists;
   char *cfile, *ofile;
 
   /* Check C files*/
-  dll_traverse(tmp, clist) {
+  dll_traverse(tmp, m->list[0]) {
     cfile = tmp->val.s;
     
     /* Find time of C file */
     exists = stat(cfile, &buf);
     if(exists < 0) {
       fprintf(stderr, "%s not available,\n", cfile);
-      return NULL;
+      return 1;
     } else { ctime = buf.st_mtime; }
+
     /* Stat .o file corresponding with C file */
     ofile = ofile_copy(cfile);
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
+    jrb_insert_str(m->ctoo, cfile, new_jval_s(ofile));
 
-    jrb_insert_str(ctoo, cfile, new_jval_s(ofile));
     /* Check if C file needs to be recompiled*/
     if(exists < 0 || otime < ctime || otime < *htime) {
       printf("%s needs to be recompiled.\n", tmp->val.s);
-      dll_append(recompile, new_jval_s(cfile));
+      dll_append(m->recompiled, new_jval_s(cfile));
     }
-    // free(ofile);
   }
-  return recompile;
+
+  return 0;
 }
 
-void no_executable(MF *m, Dllist tmp, IS is) {
-  fprintf(stderr, "No Executable Found.\n");
+void delete_everything(MF *m, Dllist tmp, IS is) {
   rm_make(m, tmp);
   jettison_inputstruct(is);
-  exit(1);
 }
 
 int main(int argc, char **argv) {
@@ -155,28 +160,25 @@ int main(int argc, char **argv) {
   MF *m = read_file(is, &foundE);
   Dllist tmp;
   /* Check if executable was in file*/
-  if(foundE == 0) { no_executable(m, tmp, is); }
+  if(foundE == 0) {
+    fprintf(stderr, "No Executable Found.\n");
+    delete_everything(m, tmp, is);
+  }
   
-  // print(m);
   UL htime = headers(m->list[1], tmp);
-  JRB ctoo = make_jrb();
-  Dllist recompile = sources(m->list[0], tmp, ctoo, &htime);
-  if(recompile == NULL) {
-    jrb_free_tree(ctoo);
-    free_dllist(recompile);
-    rm_make(m, tmp);
-    jettison_inputstruct(is);
+  int result = sources(m, tmp, &htime);
+  if(result) {
+    fprintf(stderr, "Error reading source files\n");
     return 1;
   }
-  JRB ptr;
-  dll_traverse(tmp, recompile) {
+
+  dll_traverse(tmp, m->recompiled) {
     char *c = tmp->val.s;
-    char *o = (char*)jrb_find_str(ctoo, c)->val.s;
+    char *o = (char*)jrb_find_str(m->ctoo, c)->val.s;
     printf("C:%s O:%s\n", c, o);
     free(o);
   }
-  jrb_free_tree(ctoo);
-  free_dllist(recompile);
-  rm_make(m, tmp);
-  jettison_inputstruct(is);
+
+  delete_everything(m, tmp, is);
+  return 0;
 }
