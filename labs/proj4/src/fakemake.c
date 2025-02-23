@@ -103,33 +103,37 @@ char* ofile_copy(char *cfile) {
   return ofile;
 }
 
-void sources(Dllist d, Dllist tmp, const UL *htime) {
+Dllist sources(Dllist clist, Dllist tmp, JRB ctoo, const UL *htime) {
+  Dllist recompile = new_dllist();
   struct stat buf;
   UL ctime, otime;
   int exists;
   char *cfile, *ofile;
 
   /* Check C files*/
-  dll_traverse(tmp, d) {
+  dll_traverse(tmp, clist) {
     cfile = tmp->val.s;
     
     /* Find time of C file */
     exists = stat(cfile, &buf);
     if(exists < 0) {
       fprintf(stderr, "%s not available,\n", cfile);
-      return;
+      return NULL;
     } else { ctime = buf.st_mtime; }
     /* Stat .o file corresponding with C file */
     ofile = ofile_copy(cfile);
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
 
+    jrb_insert_str(ctoo, cfile, new_jval_s(ofile));
     /* Check if C file needs to be recompiled*/
     if(exists < 0 || otime < ctime || otime < *htime) {
       printf("%s needs to be recompiled.\n", tmp->val.s);
+      dll_append(recompile, new_jval_s(cfile));
     }
-    free(ofile);
+    // free(ofile);
   }
+  return recompile;
 }
 
 void no_executable(MF *m, Dllist tmp, IS is) {
@@ -155,8 +159,24 @@ int main(int argc, char **argv) {
   
   // print(m);
   UL htime = headers(m->list[1], tmp);
-  sources(m->list[0], tmp, &htime);
-
+  JRB ctoo = make_jrb();
+  Dllist recompile = sources(m->list[0], tmp, ctoo, &htime);
+  if(recompile == NULL) {
+    jrb_free_tree(ctoo);
+    free_dllist(recompile);
+    rm_make(m, tmp);
+    jettison_inputstruct(is);
+    return 1;
+  }
+  JRB ptr;
+  dll_traverse(tmp, recompile) {
+    char *c = tmp->val.s;
+    char *o = (char*)jrb_find_str(ctoo, c)->val.s;
+    printf("C:%s O:%s\n", c, o);
+    free(o);
+  }
+  jrb_free_tree(ctoo);
+  free_dllist(recompile);
   rm_make(m, tmp);
   jettison_inputstruct(is);
 }
