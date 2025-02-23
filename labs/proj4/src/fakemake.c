@@ -19,7 +19,7 @@ typedef struct makefile {
 } MF;
 
 MF* create_make() {
-  /* Take struct with default values and set MF pointer to them */
+  /* Malloc and set default values for MF */
   MF *m = (MF*)malloc(sizeof(MF));  
   for(size_t i = 0; i < 4; i++) {
     m->list[i] = new_dllist();
@@ -55,26 +55,28 @@ JRB map(MF *m) {
   return map;
 }
 
-MF* read_file(IS is, unsigned char *foundE) {
+MF* read_file(IS is, char *foundE) {
   MF *m = create_make();
-  JRB letter = map(m);
+  JRB file_map = map(m);
   Dllist list;
-  /* Read descriptor file */
-  while(get_line(is) >= 0) {
-    if(is->NF == 0) { continue; }                 /* Skip if blank line */
 
-    if(strcmp(is->fields[0], "E") == 0) {
-      *foundE = 1;
-      m->exectuable = strdup(is->fields[1]);
-    } else {
-      list = (Dllist)jrb_find_str(letter, is->fields[0])->val.v;
-      /* Add files into corresponding Dllist */
+  while(get_line(is) >= 0) {
+    /* Skip if blank line */
+    if(is->NF == 0) { continue; }
+    char *letter = is->fields[0];
+    /* If not E, add list into dllist */
+    if(strcmp(letter, "E") != 0) {
+      list = (Dllist)jrb_find_str(file_map, letter)->val.v;
       for(int i = 1; i < is->NF; i++) {
         dll_append(list, new_jval_s(strdup(is->fields[i])));
       }
+    } else {
+      /* Set executable */
+      *foundE = 1;
+      m->exectuable = strdup(is->fields[1]);
     }
   }
-  jrb_free_tree(letter);
+  jrb_free_tree(file_map);
   return m;
 }
 
@@ -95,7 +97,7 @@ UL headers(Dllist d, Dllist tmp) {
   return htime;
 }
 
-char* ocopy(char *cfile) {
+char* ofile_copy(char *cfile) {
   char *ofile = strdup(cfile);
   ofile[strlen(ofile)-1] = 'o'; 
   return ofile;
@@ -118,7 +120,7 @@ void sources(Dllist d, Dllist tmp, const UL *htime) {
       return;
     } else { ctime = buf.st_mtime; }
     /* Stat .o file corresponding with C file */
-    ofile = ocopy(cfile);
+    ofile = ofile_copy(cfile);
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
 
@@ -130,6 +132,13 @@ void sources(Dllist d, Dllist tmp, const UL *htime) {
   }
 }
 
+void no_executable(MF *m, Dllist tmp, IS is) {
+  fprintf(stderr, "No Executable Found.\n");
+  rm_make(m, tmp);
+  jettison_inputstruct(is);
+  exit(1);
+}
+
 int main(int argc, char **argv) {
   /* Reading in through argv or stdin */
   IS is = (argc == 2) ? new_inputstruct(argv[1]) : new_inputstruct(NULL);
@@ -138,16 +147,11 @@ int main(int argc, char **argv) {
     return 1;
   }
   
-  unsigned char foundE = 0;
+  char foundE = 0;
   MF *m = read_file(is, &foundE);
   Dllist tmp;
   /* Check if executable was in file*/
-  if(foundE == 0) {
-    fprintf(stderr, "No Executable Found.\n");
-    rm_make(m, tmp);
-    jettison_inputstruct(is);
-    return 1;
-  }
+  if(foundE == 0) { no_executable(m, tmp, is); }
   
   // print(m);
   UL htime = headers(m->list[1], tmp);
