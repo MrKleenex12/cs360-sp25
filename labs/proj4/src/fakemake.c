@@ -5,6 +5,7 @@
 #include "fields.h"
 #include "dllist.h"
 #include "jval.h"
+#include "jrb.h"
 
 typedef unsigned long UL;
 
@@ -39,39 +40,41 @@ void rm_make(MF *m, Dllist tmp) {
   /* Free everything in a MF */
   if(m->exectuable != NULL) { free(m->exectuable); }
   for(size_t i = 0; i < 4; i++) {
-    Dllist list = m->list[i];
-    dll_traverse(tmp, list) { free(tmp->val.s); }
-    free_dllist(list);
+    dll_traverse(tmp, m->list[i]) { free(tmp->val.s); }
+    free_dllist(m->list[i]);
   }
   free(m);
 }
 
+JRB map(MF *m) {
+  JRB map = make_jrb();
+  jrb_insert_str(map, "C", new_jval_v((void*)m->list[0]));
+  jrb_insert_str(map, "H", new_jval_v((void*)m->list[1]));
+  jrb_insert_str(map, "F", new_jval_v((void*)m->list[2]));
+  jrb_insert_str(map, "L", new_jval_v((void*)m->list[3]));
+  return map;
+}
+
 MF* read_file(IS is, unsigned char *foundE) {
   MF *m = create_make();
-  Dllist tmp;
+  JRB letter = map(m);
+  Dllist list;
   /* Read descriptor file */
   while(get_line(is) >= 0) {
     if(is->NF == 0) { continue; }                 /* Skip if blank line */
 
-    /* Source files */
-    if(strcmp(is->fields[0], "C") == 0) { tmp = m->list[0];}
-    /* Header files */
-    else if(strcmp(is->fields[0], "H") == 0) { tmp = m->list[1];}
-    /* Flags */
-    else if(strcmp(is->fields[0], "F") == 0) { tmp = m->list[2]; }
-    /* Libraries */
-    else if(strcmp(is->fields[0], "L") == 0) { tmp = m->list[3];}
-    /* Executable name */
-    else if(strcmp(is->fields[0], "E") == 0) {
+    if(strcmp(is->fields[0], "E") == 0) {
       *foundE = 1;
       m->exectuable = strdup(is->fields[1]);
-      continue;
-    }
-    /* Add files into corresponding Dllist */
-    for(int i = 1; i < is->NF; i++) {
-      dll_append(tmp, new_jval_s(strdup(is->fields[i])));
+    } else {
+      list = (Dllist)jrb_find_str(letter, is->fields[0])->val.v;
+      /* Add files into corresponding Dllist */
+      for(int i = 1; i < is->NF; i++) {
+        dll_append(list, new_jval_s(strdup(is->fields[i])));
+      }
     }
   }
+  jrb_free_tree(letter);
   return m;
 }
 
@@ -148,9 +151,7 @@ int main(int argc, char **argv) {
   
   // print(m);
   UL htime = headers(m->list[1], tmp);
-  printf("max header time: %ld\n", htime);
   sources(m->list[0], tmp, &htime);
-
 
   rm_make(m, tmp);
   jettison_inputstruct(is);
