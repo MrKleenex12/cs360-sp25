@@ -20,15 +20,6 @@ typedef struct makefile {
   char* exectuable;
 } MF;
 
-MF* create_make() {
-  /* Malloc and set default values for MF */
-  MF *m = (MF*)malloc(sizeof(MF));  
-  for(size_t i = 0; i < 4; i++) { m->list[i] = new_dllist(); }
-  m->recompiled = new_dllist();
-  m->ctoo = make_jrb();
-  return m;
-}
-
 void print(MF *m) {
   printf("Executable: %s\n", m->exectuable);
   Dllist tmp;
@@ -36,6 +27,15 @@ void print(MF *m) {
     dll_traverse(tmp, m->list[i]) { printf("%s ", tmp->val.s); }
     printf("\n");
   }
+}
+
+MF* create_make() {
+  /* Malloc and set default values for MF */
+  MF *m = (MF*)malloc(sizeof(MF));  
+  for(size_t i = 0; i < 4; i++) { m->list[i] = new_dllist(); }
+  m->recompiled = new_dllist();
+  m->ctoo = make_jrb();
+  return m;
 }
 
 /* Free everything in a MF */
@@ -51,6 +51,11 @@ void rm_make(MF *m, Dllist tmp) {
   free_dllist(m->recompiled);
   jrb_free_tree(m->ctoo);
   free(m);
+}
+
+void delete_everything(MF *m, Dllist tmp, IS is) {
+  rm_make(m, tmp);
+  jettison_inputstruct(is);
 }
 
 JRB map(MF *m) {
@@ -122,20 +127,19 @@ int sources(MF *m, Dllist tmp, const UL *htime) {
     
     /* Find time of C file */
     exists = stat(cfile, &buf);
-    if(exists < 0) {
+    if(exists >= 0) { ctime = buf.st_mtime;}
+    else {
       fprintf(stderr, "%s not available,\n", cfile);
       return 1;
-    } else { ctime = buf.st_mtime; }
-
+    }
     /* Stat .o file corresponding with C file */
     ofile = ofile_copy(cfile);
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
     jrb_insert_str(m->ctoo, cfile, new_jval_s(ofile));
-
     /* Check if C file needs to be recompiled*/
     if(exists < 0 || otime < ctime || otime < *htime) {
-      printf("%s needs to be recompiled.\n", tmp->val.s);
+      // printf("%s needs to be recompiled.\n", tmp->val.s);
       dll_append(m->recompiled, new_jval_s(cfile));
     }
   }
@@ -143,9 +147,33 @@ int sources(MF *m, Dllist tmp, const UL *htime) {
   return 0;
 }
 
-void delete_everything(MF *m, Dllist tmp, IS is) {
-  rm_make(m, tmp);
-  jettison_inputstruct(is);
+char* base_call(Dllist flist, Dllist tmp, u_int32_t *len) {
+  *len = 6;
+  /* Add strlen of flags */
+  dll_traverse(tmp, flist) { *len += strlen(tmp->val.s)+1; }
+  char *call = (char*)malloc((*len+1) * sizeof(char));
+  strcpy(call, "gcc -c");
+  *len = 6;
+  /* Copy all flags into call */
+  dll_traverse(tmp, flist) {
+    call[*len] = ' ';
+    strcpy(call+*len+1, tmp->val.s);
+    *len += strlen(call+*len);
+  }
+  return call;
+}
+
+void compile_objs(MF *m, Dllist tmp) {
+  u_int32_t len = 0;
+  char *call = base_call(m->list[2], tmp, &len);
+  printf("%d - %s\n", len, call);
+  free(call);
+  /*
+  dll_traverse(tmp, m->recompiled) {
+    char *c = tmp->val.s;
+    char *o = (char*)jrb_find_str(m->ctoo, c)->val.s;
+  }
+  */
 }
 
 int main(int argc, char **argv) {
@@ -169,16 +197,16 @@ int main(int argc, char **argv) {
   int result = sources(m, tmp, &htime);
   if(result) {
     fprintf(stderr, "Error reading source files\n");
+    delete_everything(m, tmp, is);
     return 1;
   }
 
-  dll_traverse(tmp, m->recompiled) {
-    char *c = tmp->val.s;
-    char *o = (char*)jrb_find_str(m->ctoo, c)->val.s;
-    printf("C:%s O:%s\n", c, o);
-    free(o);
+  compile_objs(m, tmp);
+  
+  JRB j;
+  jrb_traverse(j, m->ctoo) {
+    free(j->val.s);
   }
-
   delete_everything(m, tmp, is);
   return 0;
 }
