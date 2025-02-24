@@ -218,6 +218,7 @@ void E_compile(MF *m, Dllist tmp, JRB j) {
   call = new_call(call, &len, m->exectuable);             /* Add executable */
   /* Add all obj files to call */
   jrb_traverse(j, m->ctoo) { call = new_call(call, &len, j->val.s); } 
+  printf("%s\n", call);
   system(call);                                           /* Make executable */
   free(call);
 }
