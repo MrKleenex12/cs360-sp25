@@ -155,12 +155,12 @@ int S_check(MF *m, Dllist tmp, const UL *htime) {
   return nfiles;
 }
 
-char* base_call(Dllist flist, Dllist tmp, u_int32_t *len) {
-  *len = 6;
+char* base_call(Dllist flist, Dllist tmp, u_int32_t *len, const char *base) {
+  *len = strlen(base);
   /* Add strlen of flags */
   dll_traverse(tmp, flist) { *len += strlen(tmp->val.s)+1; }
   char *call = (char*)malloc((*len+1) * sizeof(char));
-  strcpy(call, "gcc -c");
+  strcpy(call, base);
   *len = 6;
   /* Copy all flags into call */
   dll_traverse(tmp, flist) {
@@ -173,7 +173,7 @@ char* base_call(Dllist flist, Dllist tmp, u_int32_t *len) {
 
 void O_compile(MF *m, Dllist tmp) {
   u_int32_t len = 0;
-  char *call = base_call(m->list[2], tmp, &len);
+  char *call = base_call(m->list[2], tmp, &len, "gcc -c");
   /* Call all files that need to be recompiled */
   dll_traverse(tmp, m->recompiled) {
     /* Realloc space for call and create string */
