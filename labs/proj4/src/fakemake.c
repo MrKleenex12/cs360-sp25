@@ -21,7 +21,7 @@ typedef struct makefile {
 } MF;
 
 void print(MF *m) {
-  printf("Executable: %s\n", m->exectuable);
+  printf("executable: %s\n", m->exectuable);
   Dllist tmp;
   for(size_t i = 0; i < 4; i++) {
     dll_traverse(tmp, m->list[i]) { printf("%s ", tmp->val.s); }
@@ -29,7 +29,7 @@ void print(MF *m) {
   }
 }
 
-MF* create_make() {
+MF* new_make() {
   /* Malloc and set default values for MF */
   MF *m = (MF*)malloc(sizeof(MF));  
   m->exectuable = NULL;
@@ -40,7 +40,7 @@ MF* create_make() {
 }
 
 /* Free everything in a MF */
-void rm_make(MF *m, Dllist tmp, JRB j) {
+void delete_make(MF *m, Dllist tmp, JRB j) {
   /* Free executable */
   if(m->exectuable != NULL) { free(m->exectuable); }
   /* Free all file lists */
@@ -57,22 +57,22 @@ void rm_make(MF *m, Dllist tmp, JRB j) {
 }
 
 void delete_everything(MF *m, Dllist tmp, JRB j, IS is) {
-  rm_make(m, tmp, j);
+  delete_make(m, tmp, j);
   jettison_inputstruct(is);
 }
 
-JRB map(MF *m) {
-  JRB map = make_jrb();
-  jrb_insert_str(map, "C", new_jval_v((void*)m->list[0]));
-  jrb_insert_str(map, "H", new_jval_v((void*)m->list[1]));
-  jrb_insert_str(map, "F", new_jval_v((void*)m->list[2]));
-  jrb_insert_str(map, "L", new_jval_v((void*)m->list[3]));
-  return map;
+JRB make_map(MF *m) {
+  JRB make_map = make_jrb();
+  jrb_insert_str(make_map, "C", new_jval_v((void*)m->list[0]));
+  jrb_insert_str(make_map, "H", new_jval_v((void*)m->list[1]));
+  jrb_insert_str(make_map, "F", new_jval_v((void*)m->list[2]));
+  jrb_insert_str(make_map, "L", new_jval_v((void*)m->list[3]));
+  return make_map;
 }
 
 int read_file(IS is, MF **m) {
-  *m = create_make();
-  JRB file_map = map(*m);
+  *m = new_make();
+  JRB file_map = make_map(*m);
   Dllist list;
   int foundE = 0;
 
@@ -99,7 +99,7 @@ int read_file(IS is, MF **m) {
   return foundE;
 }
 
-UL headers(Dllist d, Dllist tmp) {
+UL H_check(Dllist d, Dllist tmp) {
   struct stat buf;
   UL max_time = 0;
   int exists;
@@ -116,13 +116,13 @@ UL headers(Dllist d, Dllist tmp) {
   return max_time;
 }
 
-char* ofile_copy(char *cfile) {
+char* to_obj(char *cfile) {
   char *ofile = strdup(cfile);
   ofile[strlen(ofile)-1] = 'o'; 
   return ofile;
 }
 
-int sources(MF *m, Dllist tmp, const UL *htime) {
+int S_check(MF *m, Dllist tmp, const UL *htime) {
   struct stat buf;
   UL ctime, otime;
   int exists;
@@ -141,7 +141,7 @@ int sources(MF *m, Dllist tmp, const UL *htime) {
       return -1;
     }
     /* Stat .o file corresponding with C file */
-    ofile = ofile_copy(cfile);
+    ofile = to_obj(cfile);
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
     jrb_insert_str(m->ctoo, cfile, new_jval_s(ofile));
@@ -171,7 +171,7 @@ char* base_call(Dllist flist, Dllist tmp, u_int32_t *len) {
   return call;
 }
 
-void compile_objs(MF *m, Dllist tmp) {
+void O_compile(MF *m, Dllist tmp) {
   u_int32_t len = 0;
   char *call = base_call(m->list[2], tmp, &len);
   /* Call all files that need to be recompiled */
@@ -187,7 +187,7 @@ void compile_objs(MF *m, Dllist tmp) {
   free(call);
 }
 
-UL check_objs(MF *m, JRB tmp) {
+UL O_check(MF *m, JRB tmp) {
   struct stat buf;
   int exists;
   UL max_time = 0;
@@ -204,7 +204,11 @@ UL check_objs(MF *m, JRB tmp) {
   return max_time;
 }
 
-void executable(MF *m, const UL obj_time) {
+void E_compile() {
+
+}
+
+void E_check(MF *m, const UL obj_time) {
   struct stat buf;
   UL exe_time;
   int exists;
@@ -231,28 +235,28 @@ int main(int argc, char **argv) {
   int result = read_file(is, &m);         /* Check if executable was in file*/
   /* Error Check */
   if(result == -1 || result == 0) {
-    char *str = (result == 0) ? "No Executable Found" : "Bad File";
+    char *str = (result == 0) ? "No executable Found" : "Bad File";
     fprintf(stderr, "%s\n", str);
     delete_everything(m, tmp, j, is);
     return 1;
   }
 
-  UL htime = headers(m->list[1], tmp);    /* Find time header was updated */
-  int ncfiles = sources(m, tmp, &htime);  /* Number of C files need to be recompiled */
+  UL htime = H_check(m->list[1], tmp);    /* Find time header was updated */
+  int ncfiles = S_check(m, tmp, &htime);  /* Number of C files need to be recompiled */
 
   /* Error Check */
   if(ncfiles == -1) {
     fprintf(stderr, "Error reading source files\n");
     delete_everything(m, tmp, j, is);
     return 1;
-  } else if(ncfiles != 0) { compile_objs(m, tmp); }
+  } else if(ncfiles != 0) { O_compile(m, tmp); }
 
-  UL max_obj_time = check_objs(m, j);        /* Find time most recent obj was updated*/
+  UL max_obj_time = O_check(m, j);        /* Find time most recent obj was updated*/
 
   /* Error Check */
   if(max_obj_time == 1) { return 1; }
 
-  executable(m, max_obj_time);
+  E_check(m, max_obj_time);
    
   delete_everything(m, tmp, j, is);
   return 0;
