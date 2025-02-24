@@ -204,6 +204,18 @@ UL check_objs(MF *m, JRB tmp) {
   return max_time;
 }
 
+void executable(MF *m, const UL obj_time) {
+  struct stat buf;
+  UL exe_time;
+  int exists;
+
+  exists = stat(m->exectuable, &buf);
+  exe_time = buf.st_mtime;
+  if(exists < 0 || exe_time < obj_time) {
+    printf("Need to compile %s\n", m->exectuable);
+  }
+}
+
 int main(int argc, char **argv) {
   /* Reading in through argv or stdin */
   IS is = (argc == 2) ? new_inputstruct(argv[1]) : new_inputstruct(NULL);
@@ -244,6 +256,7 @@ int main(int argc, char **argv) {
       if no executable file is found or
       object files are more recent than executable
   */
+  executable(m, max_otime);
    
   delete_everything(m, tmp, j, is);
   return 0;
