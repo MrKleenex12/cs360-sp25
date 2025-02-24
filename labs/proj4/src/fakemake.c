@@ -81,7 +81,7 @@ int read_file(IS is, MF **m) {
     if(is->NF == 0) { continue; }
     char *letter = is->fields[0];
     if(strlen(letter) > 1) {
-      free(file_map);
+      jrb_free_tree(file_map);
       return -1;
     }
     /* If not E, add list into dllist */
