@@ -7,4 +7,5 @@ makefile
 lab-testing
 *.o
 mysort
+mysort.fm
 f
