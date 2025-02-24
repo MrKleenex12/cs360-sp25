@@ -39,7 +39,7 @@ MF* create_make() {
 }
 
 /* Free everything in a MF */
-void rm_make(MF *m, Dllist tmp) {
+void rm_make(MF *m, Dllist tmp, JRB j) {
   /* Free executable */
   if(m->exectuable != NULL) { free(m->exectuable); }
   /* Free all file lists */
@@ -47,14 +47,16 @@ void rm_make(MF *m, Dllist tmp) {
     dll_traverse(tmp, m->list[i]) { free(tmp->val.s); }
     free_dllist(m->list[i]);
   }
+  jrb_traverse(j, m->ctoo) { free(j->val.s); }
+
   /* Free other stuff */
   free_dllist(m->recompiled);
   jrb_free_tree(m->ctoo);
   free(m);
 }
 
-void delete_everything(MF *m, Dllist tmp, IS is) {
-  rm_make(m, tmp);
+void delete_everything(MF *m, Dllist tmp, JRB j, IS is) {
+  rm_make(m, tmp, j);
   jettison_inputstruct(is);
 }
 
@@ -94,7 +96,7 @@ MF* read_file(IS is, char *foundE) {
 
 UL headers(Dllist d, Dllist tmp) {
   struct stat buf;
-  UL htime = 0;
+  UL max_time = 0;
   int exists;
   /* Find time of most recently modified header file */
   dll_traverse(tmp, d) {
@@ -104,9 +106,9 @@ UL headers(Dllist d, Dllist tmp) {
       return -1;
     }
     /* Check if max time */
-    if(buf.st_mtime > htime) { htime = buf.st_mtime; }
+    if(buf.st_mtime > max_time) { max_time = buf.st_mtime; }
   }
-  return htime;
+  return max_time;
 }
 
 char* ofile_copy(char *cfile) {
@@ -119,6 +121,7 @@ int sources(MF *m, Dllist tmp, const UL *htime) {
   struct stat buf;
   UL ctime, otime;
   int exists;
+  int nfiles = 0;
   char *cfile, *ofile;
 
   /* Check C files*/
@@ -130,7 +133,7 @@ int sources(MF *m, Dllist tmp, const UL *htime) {
     if(exists >= 0) { ctime = buf.st_mtime;}
     else {
       fprintf(stderr, "%s not available,\n", cfile);
-      return 1;
+      return -1;
     }
     /* Stat .o file corresponding with C file */
     ofile = ofile_copy(cfile);
@@ -139,12 +142,12 @@ int sources(MF *m, Dllist tmp, const UL *htime) {
     jrb_insert_str(m->ctoo, cfile, new_jval_s(ofile));
     /* Check if C file needs to be recompiled*/
     if(exists < 0 || otime < ctime || otime < *htime) {
-      // printf("%s needs to be recompiled.\n", tmp->val.s);
       dll_append(m->recompiled, new_jval_s(cfile));
+      nfiles++; 
     }
   }
 
-  return 0;
+  return nfiles;
 }
 
 char* base_call(Dllist flist, Dllist tmp, u_int32_t *len) {
@@ -179,6 +182,23 @@ void compile_objs(MF *m, Dllist tmp) {
   free(call);
 }
 
+UL check_objs(MF *m, JRB tmp) {
+  struct stat buf;
+  int exists;
+  UL max_time = 0;
+
+  /* Find Most recent obj file */
+  jrb_traverse(tmp, m->ctoo) {
+    exists = stat(tmp->val.s, &buf);
+    if(exists < 0) {
+      fprintf(stderr, "%s doesn't exist\n", tmp->val.s);
+      return 1;
+    }
+    if(buf.st_mtime > max_time) { max_time = buf.st_mtime; }
+  }
+  return max_time;
+}
+
 int main(int argc, char **argv) {
   /* Reading in through argv or stdin */
   IS is = (argc == 2) ? new_inputstruct(argv[1]) : new_inputstruct(NULL);
@@ -190,26 +210,32 @@ int main(int argc, char **argv) {
   char foundE = 0;
   MF *m = read_file(is, &foundE);
   Dllist tmp;
+  JRB j;
   /* Check if executable was in file*/
   if(foundE == 0) {
     fprintf(stderr, "No Executable Found.\n");
-    delete_everything(m, tmp, is);
+    delete_everything(m, tmp, j, is);
   }
-  
+  /* Find time header was updated */
   UL htime = headers(m->list[1], tmp);
-  int result = sources(m, tmp, &htime);
-  if(result) {
+  /* Check which C files need to be recompiled */
+  int ncfiles = sources(m, tmp, &htime);
+  if(ncfiles == -1) {
     fprintf(stderr, "Error reading source files\n");
-    delete_everything(m, tmp, is);
+    delete_everything(m, tmp, j, is);
     return 1;
   }
+  /* Compile neccesary files */
+  if(ncfiles != 0) { compile_objs(m, tmp); }
+  /* Find most recent obj */
+  UL max_otime = check_objs(m, j);
+  if(max_otime == 1) { return 1; }
 
-  compile_objs(m, tmp);
-  
-  JRB j;
-  jrb_traverse(j, m->ctoo) {
-    free(j->val.s);
-  }
-  delete_everything(m, tmp, is);
+  /*  check for executable 
+      if no executable file is found or
+      object files are more recent than executable
+  */
+   
+  delete_everything(m, tmp, j, is);
   return 0;
 }
