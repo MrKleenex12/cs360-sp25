@@ -227,36 +227,32 @@ int main(int argc, char **argv) {
   MF *m;
   Dllist tmp;
   JRB j;
-  /* Check if executable was in file*/
-  int result = read_file(is, &m);
-  if(result == -1) {
-    fprintf(stderr, "Bad file.\n");
+
+  int result = read_file(is, &m);         /* Check if executable was in file*/
+  /* Error Check */
+  if(result == -1 || result == 0) {
+    char *str = (result == 0) ? "No Executable Found" : "Bad File";
+    fprintf(stderr, "%s\n", str);
     delete_everything(m, tmp, j, is);
     return 1;
   }
-  if(result == 0) {
-    fprintf(stderr, "No Executable Found.\n");
-    delete_everything(m, tmp, j, is);
-    return 1;
-  }
-  /* Find time header was updated */
-  UL htime = headers(m->list[1], tmp);
-  /* Number of C files need to be recompiled */
-  int ncfiles = sources(m, tmp, &htime);
+
+  UL htime = headers(m->list[1], tmp);    /* Find time header was updated */
+  int ncfiles = sources(m, tmp, &htime);  /* Number of C files need to be recompiled */
+
+  /* Error Check */
   if(ncfiles == -1) {
     fprintf(stderr, "Error reading source files\n");
     delete_everything(m, tmp, j, is);
     return 1;
   } else if(ncfiles != 0) { compile_objs(m, tmp); }
-  /* Find time most recent obj was updated*/
-  UL max_otime = check_objs(m, j);
-  if(max_otime == 1) { return 1; }
 
-  /*  check for executable 
-      if no executable file is found or
-      object files are more recent than executable
-  */
-  executable(m, max_otime);
+  UL max_obj_time = check_objs(m, j);        /* Find time most recent obj was updated*/
+
+  /* Error Check */
+  if(max_obj_time == 1) { return 1; }
+
+  executable(m, max_obj_time);
    
   delete_everything(m, tmp, j, is);
   return 0;
