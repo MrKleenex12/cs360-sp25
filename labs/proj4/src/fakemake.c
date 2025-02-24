@@ -218,8 +218,10 @@ void E_compile(MF *m, Dllist tmp, JRB j) {
   call = new_call(call, &len, m->exectuable);             /* Add executable */
   /* Add all obj files to call */
   jrb_traverse(j, m->ctoo) { call = new_call(call, &len, j->val.s); } 
+  /* Add any libraries */
+  dll_traverse(tmp, m->list[3]) { call = new_call(call, &len, tmp->val.s); }
   printf("%s\n", call);
-  // system(call);                                           /* Make executable */
+  system(call);                                           /* Make executable */
   free(call);
 }
 
