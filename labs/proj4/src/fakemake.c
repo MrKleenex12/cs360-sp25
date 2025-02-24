@@ -32,6 +32,7 @@ void print(MF *m) {
 MF* create_make() {
   /* Malloc and set default values for MF */
   MF *m = (MF*)malloc(sizeof(MF));  
+  m->exectuable = NULL;
   for(size_t i = 0; i < 4; i++) { m->list[i] = new_dllist(); }
   m->recompiled = new_dllist();
   m->ctoo = make_jrb();
@@ -69,29 +70,30 @@ JRB map(MF *m) {
   return map;
 }
 
-MF* read_file(IS is, char *foundE) {
-  MF *m = create_make();
-  JRB file_map = map(m);
+int read_file(IS is, MF **m) {
+  *m = create_make();
+  JRB file_map = map(*m);
   Dllist list;
+  int foundE = 0;
 
   while(get_line(is) >= 0) {
     /* Skip if blank line */
     if(is->NF == 0) { continue; }
     char *letter = is->fields[0];
+    if(strlen(letter) > 1) { return -1; }
     /* If not E, add list into dllist */
     if(strcmp(letter, "E") != 0) {
       list = (Dllist)jrb_find_str(file_map, letter)->val.v;
       for(int i = 1; i < is->NF; i++) {
         dll_append(list, new_jval_s(strdup(is->fields[i])));
       }
-    } else {
-      /* Set executable */
-      *foundE = 1;
-      m->exectuable = strdup(is->fields[1]);
+    } else { /* If E */
+      foundE = 1;
+      (*m)->exectuable = strdup(is->fields[1]);
     }
   }
   jrb_free_tree(file_map);
-  return m;
+  return foundE;
 }
 
 UL headers(Dllist d, Dllist tmp) {
@@ -207,27 +209,31 @@ int main(int argc, char **argv) {
     return 1;
   }
   
-  char foundE = 0;
-  MF *m = read_file(is, &foundE);
+  MF *m;
   Dllist tmp;
   JRB j;
   /* Check if executable was in file*/
-  if(foundE == 0) {
+  int result = read_file(is, &m);
+  if(result == -1) {
+    fprintf(stderr, "Bad file.\n");
+    delete_everything(m, tmp, j, is);
+    return 1;
+  }
+  if(result == 0) {
     fprintf(stderr, "No Executable Found.\n");
     delete_everything(m, tmp, j, is);
+    return 1;
   }
   /* Find time header was updated */
   UL htime = headers(m->list[1], tmp);
-  /* Check which C files need to be recompiled */
+  /* Number of C files need to be recompiled */
   int ncfiles = sources(m, tmp, &htime);
   if(ncfiles == -1) {
     fprintf(stderr, "Error reading source files\n");
     delete_everything(m, tmp, j, is);
     return 1;
-  }
-  /* Compile neccesary files */
-  if(ncfiles != 0) { compile_objs(m, tmp); }
-  /* Find most recent obj */
+  } else if(ncfiles != 0) { compile_objs(m, tmp); }
+  /* Find time most recent obj was updated*/
   UL max_otime = check_objs(m, j);
   if(max_otime == 1) { return 1; }
 
