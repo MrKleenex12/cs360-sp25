@@ -80,7 +80,10 @@ int read_file(IS is, MF **m) {
     /* Skip if blank line */
     if(is->NF == 0) { continue; }
     char *letter = is->fields[0];
-    if(strlen(letter) > 1) { return -1; }
+    if(strlen(letter) > 1) {
+      free(file_map);
+      return -1;
+    }
     /* If not E, add list into dllist */
     if(strcmp(letter, "E") != 0) {
       list = (Dllist)jrb_find_str(file_map, letter)->val.v;
