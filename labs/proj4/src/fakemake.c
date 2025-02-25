@@ -58,41 +58,31 @@ void delete_everything(MF *m, Dllist tmp, IS is) {
   jettison_inputstruct(is);
 }
 
-JRB make_map(MF *m) {
-  JRB make_map = make_jrb();
-  jrb_insert_str(make_map, "C", new_jval_v((void*)m->list[0]));
-  jrb_insert_str(make_map, "H", new_jval_v((void*)m->list[1]));
-  jrb_insert_str(make_map, "F", new_jval_v((void*)m->list[2]));
-  jrb_insert_str(make_map, "L", new_jval_v((void*)m->list[3]));
-  return make_map;
-}
-
-int read_file(IS is, MF **m) {
-  *m = new_make();
-  JRB file_map = make_map(*m);
-  Dllist list;
+int read_file(IS is, MF *m) {
+  int index;
   int foundE = 0;
 
   while(get_line(is) >= 0) {
     /* Skip if blank line */
     if(is->NF == 0) { continue; }
     char *letter = is->fields[0];
-    if(strlen(letter) > 1) {
-      jrb_free_tree(file_map);
-      return -1;
-    }
-    /* If not E, add list into dllist */
-    if(strcmp(letter, "E") != 0) {
-      list = (Dllist)jrb_find_str(file_map, letter)->val.v;
-      for(int i = 1; i < is->NF; i++) {
-        dll_append(list, new_jval_s(strdup(is->fields[i])));
-      }
-    } else { /* If E */
+    if(strlen(letter) > 1) { return -1; }
+
+    /* Reading in files */
+    if(strcmp(letter, "E") == 0) {
       foundE = 1;
-      (*m)->exectuable = strdup(is->fields[1]);
+      m->exectuable = strdup(is->fields[1]);
+      continue;
+    }
+    else if(strcmp(letter, "C") == 0) { index = 0; }
+    else if(strcmp(letter, "H") == 0) { index = 1; }
+    else if(strcmp(letter, "F") == 0) { index = 2; }
+    else if(strcmp(letter, "L") == 0) { index = 3; }
+
+    for(int i = 1; i < is->NF; i++) {
+      dll_append(m->list[index], new_jval_s(strdup(is->fields[i])));
     }
   }
-  jrb_free_tree(file_map);
   return foundE;
 }
 
@@ -218,10 +208,10 @@ int main(int argc, char **argv) {
     return 1;
   }
   
-  MF *m;
+  MF *m = new_make();
   Dllist tmp;
 
-  int result = read_file(is, &m);         /* Check if executable was in file*/
+  int result = read_file(is, m);         /* Check if executable was in file*/
   /* Error Check */
   if(result == -1 || result == 0) {
     char *str = (result == 0) ? "No executable Found" : "Bad File";
@@ -240,7 +230,6 @@ int main(int argc, char **argv) {
     delete_everything(m, tmp, is);
     return 1;
   }
-  // else if(ncfiles != 0) { O_compile(m, tmp); }
 
   E_check(m, tmp, max_obj_time);
    
