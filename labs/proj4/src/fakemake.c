@@ -142,13 +142,21 @@ char* base_call(Dllist flist, Dllist tmp, u_int32_t *len, const char *base) {
 }
 
 void O_compile(MF *m, Dllist tmp, char *cfile) {
-  u_int32_t len = 0;
-  char *call = base_call(m->list[2], tmp, &len, "gcc -c");
-
-  call = new_call(call, &len, cfile);       /* Realloc space for call and create string */
-  system(call);                             /* System call to make files */
+  u_int32_t len = 6;
+  dll_traverse(tmp, m->list[2]) { len += strlen(tmp->val.s)+1; }
+  len += strlen(cfile)+2;
+  char *call = (char*)malloc(len * sizeof(char));
+  len = 6;
+  strcpy(call, "gcc -c");
+  call[len] = ' '; 
+  dll_traverse(tmp, m->list[2]) {
+    strcpy(call+len+1, tmp->val.s);
+    len += strlen(tmp->val.s)+1;
+    call[len] = ' ';
+  }
+  strcpy(call+len+1, cfile);
   printf("%s\n", call);
-
+  system(call);
   free(call);
 }
 
@@ -171,31 +179,56 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
     }
     /* Stat .o file corresponding with C file */
     ofile = to_obj(cfile);
+    dll_append(m->objs, new_jval_s(ofile));
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
     if(otime > *max_obj_time) { *max_obj_time = otime; }
     /* Check if C file needs to be recompiled*/
     if(exists < 0 || otime < ctime || otime < *max_htime) {
-      dll_append(m->objs, new_jval_s(ofile));
       O_compile(m, tmp, cfile);
     }
-    else { free(ofile); }
   }
 
   return 0;
 }
 
 void E_compile(MF *m, Dllist tmp) {
-  u_int32_t len = 0;
-  char *call = base_call(m->list[2], tmp, &len, "gcc");   /* Add flags before -o */
-  call = new_call(call, &len, "-o");                      /* Add -o */ 
-  call = new_call(call, &len, m->exectuable);             /* Add executable */
-  /* Add all obj files to call */
-  dll_traverse(tmp, m->objs) { call = new_call(call, &len, tmp->val.s); } 
-  /* Add any libraries */
-  dll_traverse(tmp, m->list[3]) { call = new_call(call, &len, tmp->val.s); }
+  u_int32_t len = 3;
+  dll_traverse(tmp, m->list[2]) { len += strlen(tmp->val.s)+1; } 
+  len += (4+strlen(m->exectuable));
+  dll_traverse(tmp, m->objs) { len += strlen(tmp->val.s)+1; }
+  dll_traverse(tmp, m->list[3]) { len += strlen(tmp->val.s)+1; }
+
+  char *call = (char*)malloc((len+1) * sizeof(char));
+  int original = len;
+  len = 3;
+  strcpy(call, "gcc");
+  call[len] = ' ';
+  dll_traverse(tmp, m->list[2]) {
+    strcpy(call+len+1, tmp->val.s);
+    len += strlen(tmp->val.s)+1;
+    call[len] = ' ';
+  } 
+  strcpy(call+len+1, "-o");
+  len += 3;
+  call[len] = ' ';
+  strcpy(call+len+1, m->exectuable);
+  len += strlen(m->exectuable)+1;
+  call[len] = ' ';
+  dll_traverse(tmp, m->objs) {
+    strcpy(call+len+1, tmp->val.s);
+    len += strlen(tmp->val.s)+1;
+    if(len == original) { break; }
+    call[len] = ' ';
+  }
+  dll_traverse(tmp, m->list[3]) {
+    strcpy(call+len+1, tmp->val.s);
+    len += strlen(tmp->val.s)+1;
+    if(len == original) { break; }
+    call[len] = ' ';
+  }
   printf("%s\n", call);
-  system(call);                                           /* Make executable */
+  system(call);
   free(call);
 }
 
