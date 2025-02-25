@@ -122,7 +122,7 @@ char* to_obj(char *cfile) {
   return ofile;
 }
 
-int S_check(MF *m, Dllist tmp, const UL *htime) {
+int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
   struct stat buf;
   UL ctime, otime;
   int exists;
@@ -144,9 +144,10 @@ int S_check(MF *m, Dllist tmp, const UL *htime) {
     ofile = to_obj(cfile);
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
+    if(otime > *max_obj_time) { *max_obj_time = otime; }
     jrb_insert_str(m->ctoo, cfile, new_jval_s(ofile));
     /* Check if C file needs to be recompiled*/
-    if(exists < 0 || otime < ctime || otime < *htime) {
+    if(exists < 0 || otime < ctime || otime < *max_htime) {
       dll_append(m->recompiled, new_jval_s(cfile));
       nfiles++; 
     }
@@ -259,8 +260,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  UL htime = H_check(m->list[1], tmp);    /* Find time header was updated */
-  int ncfiles = S_check(m, tmp, &htime);  /* Number of C files need to be recompiled */
+  UL max_obj_time = 0;
+  UL max_htime = H_check(m->list[1], tmp);    /* Find time header was updated */
+  int ncfiles = S_check(m, tmp, &max_htime, &max_obj_time);  /* Number of C files need to be recompiled */
 
   /* Error Check */
   if(ncfiles == -1) {
@@ -269,10 +271,10 @@ int main(int argc, char **argv) {
     return 1;
   } else if(ncfiles != 0) { O_compile(m, tmp); }
 
-  UL max_obj_time = O_check(m, j);        /* Find time most recent obj was updated*/
+  // UL max_obj_time = O_check(m, j);        /* Find time most recent obj was updated*/
 
   /* Error Check */
-  if(max_obj_time == 1) { return 1; }
+  // if(max_obj_time == 1) { return 1; }
 
   E_check(m, tmp, j, max_obj_time);
    
