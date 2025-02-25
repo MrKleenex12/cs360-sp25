@@ -15,8 +15,7 @@ typedef struct makefile {
       1 - Header files
       2 - Flags
       3 - Libraries */
-  Dllist recompiled;  /* list of c files that need to be recompiled */
-  JRB ctoo;           /* c to object files JRB */
+  Dllist objs;  /* list of o files */
   char* exectuable;
 } MF;
 
@@ -34,13 +33,12 @@ MF* new_make() {
   MF *m = (MF*)malloc(sizeof(MF));  
   m->exectuable = NULL;
   for(size_t i = 0; i < 4; i++) { m->list[i] = new_dllist(); }
-  m->recompiled = new_dllist();
-  m->ctoo = make_jrb();
+  m->objs = new_dllist();
   return m;
 }
 
 /* Free everything in a MF */
-void delete_make(MF *m, Dllist tmp, JRB j) {
+void delete_make(MF *m, Dllist tmp) {
   /* Free executable */
   if(m->exectuable != NULL) { free(m->exectuable); }
   /* Free all file lists */
@@ -48,16 +46,14 @@ void delete_make(MF *m, Dllist tmp, JRB j) {
     dll_traverse(tmp, m->list[i]) { free(tmp->val.s); }
     free_dllist(m->list[i]);
   }
-  jrb_traverse(j, m->ctoo) { free(j->val.s); }
 
   /* Free other stuff */
-  free_dllist(m->recompiled);
-  jrb_free_tree(m->ctoo);
+  free_dllist(m->objs);
   free(m);
 }
 
-void delete_everything(MF *m, Dllist tmp, JRB j, IS is) {
-  delete_make(m, tmp, j);
+void delete_everything(MF *m, Dllist tmp, IS is) {
+  delete_make(m, tmp);
   jettison_inputstruct(is);
 }
 
@@ -122,6 +118,40 @@ char* to_obj(char *cfile) {
   return ofile;
 }
 
+char* new_call(char *call, u_int32_t *len, const char *str) {
+  call = realloc(call, *len+2+strlen(str));
+  call[*len] = ' ';
+  strcpy(call+*len+1, str);
+  *len += (1+strlen(str));
+  // printf("%s - %d\n", call, *len);
+  return call;
+}
+
+char* base_call(Dllist flist, Dllist tmp, u_int32_t *len, const char *base) {
+  *len = strlen(base);
+  /* Add strlen of flags */
+  dll_traverse(tmp, flist) { *len += strlen(tmp->val.s)+1; }
+  char *call = (char*)malloc((*len+1) * sizeof(char));
+  strcpy(call, base);
+  *len = strlen(call);
+  /* Copy all flags into call */
+  dll_traverse(tmp, flist) {
+    call = new_call(call, len, tmp->val.s);
+  }
+  return call;
+}
+
+void O_compile(MF *m, Dllist tmp, char *cfile) {
+  u_int32_t len = 0;
+  char *call = base_call(m->list[2], tmp, &len, "gcc -c");
+
+  call = new_call(call, &len, cfile);       /* Realloc space for call and create string */
+  system(call);                             /* System call to make files */
+  printf("%s\n", call);
+
+  free(call);
+}
+
 int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
   struct stat buf;
   UL ctime, otime;
@@ -145,10 +175,10 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
     exists = stat(ofile, &buf);
     otime = buf.st_mtime;
     if(otime > *max_obj_time) { *max_obj_time = otime; }
-    jrb_insert_str(m->ctoo, cfile, new_jval_s(ofile));
     /* Check if C file needs to be recompiled*/
     if(exists < 0 || otime < ctime || otime < *max_htime) {
-      dll_append(m->recompiled, new_jval_s(cfile));
+      dll_append(m->objs, new_jval_s(ofile));
+      O_compile(m, tmp, cfile);
       nfiles++; 
     }
   }
@@ -156,69 +186,13 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
   return nfiles;
 }
 
-char* new_call(char *call, u_int32_t *len, const char *str) {
-  call = realloc(call, *len+2+strlen(str));
-  call[*len] = ' ';
-  strcpy(call+*len+1, str);
-  *len += (1+strlen(str));
-  // printf("%s - %d\n", call, *len);
-  return call;
-}
-
-char* base_call(Dllist flist, Dllist tmp, u_int32_t *len, const char *base) {
-  *len = strlen(base);
-  /* Add strlen of flags */
-  dll_traverse(tmp, flist) { *len += strlen(tmp->val.s)+1; }
-  char *call = (char*)malloc((*len+1) * sizeof(char));
-  strcpy(call, base);
-  *len = strlen(call);
-  /* Copy all flags into call */
-  dll_traverse(tmp, flist) {
-    call = new_call(call, len, tmp->val.s);
-    // *len += strlen(call+*len);
-  }
-  return call;
-}
-
-void O_compile(MF *m, Dllist tmp) {
-  u_int32_t len = 0;
-  char *call = base_call(m->list[2], tmp, &len, "gcc -c");
-  u_int32_t orig_len = len;
-
-  /* Call all files that need to be recompiled */
-  dll_traverse(tmp, m->recompiled) {
-    call = new_call(call, &len, tmp->val.s);  /* Realloc space for call and create string */
-    system(call);                             /* System call to make files */
-    len = orig_len;                           /* reset len for next obj */
-    printf("%s\n", call);
-  }
-  free(call);
-}
-
-UL O_check(MF *m, JRB tmp) {
-  struct stat buf;
-  int exists;
-  UL max_time = 0;
-
-  /* Find Most recent obj file */
-  jrb_traverse(tmp, m->ctoo) {
-    exists = stat(tmp->val.s, &buf);
-    if(exists < 0) {
-      fprintf(stderr, "%s doesn't exist\n", tmp->val.s);
-      return 1;
-    }
-    if(buf.st_mtime > max_time) { max_time = buf.st_mtime; }
-  }
-  return max_time;
-}
-
-void E_compile(MF *m, Dllist tmp, JRB j) {
+void E_compile(MF *m, Dllist tmp) {
   u_int32_t len = 0;
   char *call = base_call(m->list[2], tmp, &len, "gcc");   /* Add flags before -o */
   call = new_call(call, &len, "-o");                      /* Add -o */ 
   call = new_call(call, &len, m->exectuable);             /* Add executable */
   /* Add all obj files to call */
-  jrb_traverse(j, m->ctoo) { call = new_call(call, &len, j->val.s); } 
+  dll_traverse(tmp, m->objs) { call = new_call(call, &len, tmp->val.s); } 
   /* Add any libraries */
   dll_traverse(tmp, m->list[3]) { call = new_call(call, &len, tmp->val.s); }
   printf("%s\n", call);
@@ -226,17 +200,14 @@ void E_compile(MF *m, Dllist tmp, JRB j) {
   free(call);
 }
 
-void E_check(MF *m, Dllist tmp, JRB j, const UL obj_time) {
+void E_check(MF *m, Dllist tmp, const UL obj_time) {
   struct stat buf;
   UL exe_time;
   int exists;
 
   exists = stat(m->exectuable, &buf);
   exe_time = buf.st_mtime;
-  if(exists < 0 || exe_time < obj_time) {
-    // printf("Need to compile %s\n", m->exectuable);
-    E_compile(m, tmp, j);
-  }
+  if(exists < 0 || exe_time < obj_time) { E_compile(m, tmp); }
 }
 
 int main(int argc, char **argv) {
@@ -249,14 +220,13 @@ int main(int argc, char **argv) {
   
   MF *m;
   Dllist tmp;
-  JRB j;
 
   int result = read_file(is, &m);         /* Check if executable was in file*/
   /* Error Check */
   if(result == -1 || result == 0) {
     char *str = (result == 0) ? "No executable Found" : "Bad File";
     fprintf(stderr, "%s\n", str);
-    delete_everything(m, tmp, j, is);
+    delete_everything(m, tmp, is);
     return 1;
   }
 
@@ -267,17 +237,13 @@ int main(int argc, char **argv) {
   /* Error Check */
   if(ncfiles == -1) {
     fprintf(stderr, "Error reading source files\n");
-    delete_everything(m, tmp, j, is);
+    delete_everything(m, tmp, is);
     return 1;
-  } else if(ncfiles != 0) { O_compile(m, tmp); }
+  }
+  // else if(ncfiles != 0) { O_compile(m, tmp); }
 
-  // UL max_obj_time = O_check(m, j);        /* Find time most recent obj was updated*/
-
-  /* Error Check */
-  // if(max_obj_time == 1) { return 1; }
-
-  E_check(m, tmp, j, max_obj_time);
+  E_check(m, tmp, max_obj_time);
    
-  delete_everything(m, tmp, j, is);
+  delete_everything(m, tmp, is);
   return 0;
 }
