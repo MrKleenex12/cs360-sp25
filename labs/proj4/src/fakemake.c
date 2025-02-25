@@ -157,7 +157,6 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
   struct stat buf;
   UL ctime, otime;
   int exists;
-  int nfiles = 0;
   char *cfile, *ofile;
 
   /* Check C files*/
@@ -180,11 +179,11 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
     if(exists < 0 || otime < ctime || otime < *max_htime) {
       dll_append(m->objs, new_jval_s(ofile));
       O_compile(m, tmp, cfile);
-      nfiles++; 
     }
+    else { free(ofile); }
   }
 
-  return nfiles;
+  return 0;
 }
 
 void E_compile(MF *m, Dllist tmp) {
@@ -233,10 +232,10 @@ int main(int argc, char **argv) {
 
   UL max_obj_time = 0;
   UL max_htime = H_check(m->list[1], tmp);    /* Find time header was updated */
-  int ncfiles = S_check(m, tmp, &max_htime, &max_obj_time);  /* Number of C files need to be recompiled */
+  result = S_check(m, tmp, &max_htime, &max_obj_time);  /* Number of C files need to be recompiled */
 
   /* Error Check */
-  if(ncfiles == -1) {
+  if(result == -1) {
     fprintf(stderr, "Error reading source files\n");
     delete_everything(m, tmp, is);
     return 1;
