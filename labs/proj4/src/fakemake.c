@@ -48,6 +48,7 @@ void delete_make(MF *m, Dllist tmp) {
   }
 
   /* Free other stuff */
+  dll_traverse(tmp, m->objs) { free(tmp->val.s); }
   free_dllist(m->objs);
   free(m);
 }
