@@ -1,3 +1,6 @@
+/*  Lab 4 - Fakemake
+    Larry Wang
+    Takes a .fm file and compiles an executable */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -123,7 +126,6 @@ char* new_call(char *call, u_int32_t *len, const char *str) {
   call[*len] = ' ';
   strcpy(call+*len+1, str);
   *len += (1+strlen(str));
-  // printf("%s - %d\n", call, *len);
   return call;
 }
 
@@ -135,20 +137,16 @@ char* base_call(Dllist flist, Dllist tmp, u_int32_t *len, const char *base) {
   strcpy(call, base);
   *len = strlen(call);
   /* Copy all flags into call */
-  dll_traverse(tmp, flist) {
-    call = new_call(call, len, tmp->val.s);
-  }
+  dll_traverse(tmp, flist) { call = new_call(call, len, tmp->val.s); }
   return call;
 }
 
 void O_compile(MF *m, Dllist tmp, char *cfile) {
   u_int32_t len = 0;
   char *call = base_call(m->list[2], tmp, &len, "gcc -c");
-
   call = new_call(call, &len, cfile);       /* Realloc space for call and create string */
   system(call);                             /* System call to make files */
   printf("%s\n", call);
-
   free(call);
 }
 
