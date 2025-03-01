@@ -1,0 +1,6 @@
+bin/*
+!bin/.keep
+.vscode
+grade*
+index.html
+makefile
