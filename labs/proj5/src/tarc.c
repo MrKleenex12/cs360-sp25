@@ -96,6 +96,7 @@ void open_dir(const char *dir_name) {
 }
 
 int main(int argc, char **argv) {
-  open_dir(argv[1]);
+  char *dir = (argc > 1) ? argv[1] : ".";
+  open_dir(dir);
   return 0;
 }
