@@ -59,17 +59,18 @@ void process(struct stat *buf, const char *name, const char is_file, JRB printed
   printf("inode: %llu\n", buf->st_ino);
 
   if(printed == NULL) {
+    printf("Mode: %hu\n", buf->st_mode);
+    printf("Modification time: %ld\n", buf->st_mtime);
     if(is_file == 1) {
-      printf("file size: %lld\n", buf->st_size);
       FILE *file = fopen(name, "r"); 
       if(file == NULL) {
         perror(name);
         exit(1);
       }
+
+      printf("file size: %lld\n", buf->st_size);
       int c;
-      while((c = fgetc(file)) != EOF) {
-        putchar(c);
-      }
+      while((c = fgetc(file)) != EOF) { putchar(c); }
       fclose(file);
     }
   }
