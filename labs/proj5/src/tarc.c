@@ -12,39 +12,48 @@
 #include "sys/stat.h"
 
 #define BUF_SIZE 8192
+#define ARR_SIZE 10
 
-int main(int argc, char **argv) {
-  DIR *d;
-  d = opendir(".");
+typedef struct char_vec {
+  int size;
+} CV;
+
+void dir_dfs(const char *dir_name) {
+  DIR *d = opendir(dir_name);
   if(d == NULL) {
-    fprintf(stderr, "Couldn't open \".\"\n");
+    perror(dir_name);
     exit(1);
   }
 
-  struct stat buf;
   struct dirent *de;
-  JRB files, tmp;
+  struct stat buf;
   int exists;
-  int maxlen = 0;
+  Dllist dirs, tmp;
+  dirs = new_dllist();
 
-  files = make_jrb();
+  while((de = readdir(d)) != NULL) {
+    char *n = de->d_name;
+    if(strcmp(n, ".") == 0 || strcmp(n, "..") == 0) continue; 
 
-  for(de = readdir(d); de != NULL; de = readdir(d)) {
-    exists = stat(de->d_name, &buf);
-
-    if(exists < 0) { fprintf(stderr, "%s not found\n", de->d_name); }
-    else {
-      jrb_insert_str(files, strdup(de->d_name), new_jval_l(buf.st_size));
-      if(strlen(de->d_name) > maxlen) { maxlen = strlen(de->d_name); }
+    if(stat(n, &buf) == -1) {
+      perror(n);
+      exit(1);
     }
-  }
-  closedir(d);
 
-  jrb_traverse(tmp, files) {
-    printf("%*s -  %ld\n", maxlen, tmp->key.s, tmp->val.l);
-    free(tmp->key.s);
+    /* Add to directory list to check later */
+    if(S_ISDIR(buf.st_mode)) { dll_append(dirs, new_jval_s(n)); }
+    /* Print out file */
+    else { printf("FILE: %s\n", n); }
   }
 
-  jrb_free_tree(files); 
+  dll_traverse(tmp, dirs) {
+    printf("%s\n", tmp->val.s);
+  }
+
+  free_dllist(dirs);
+}
+
+int main(int argc, char **argv) {
+  dir_dfs(".");
   return 0;
 }
