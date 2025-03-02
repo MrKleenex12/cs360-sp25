@@ -51,6 +51,7 @@ void dir_dfs(const char *dir_name) {
   }
 
   free_dllist(dirs);
+  closedir(d);
 }
 
 int main(int argc, char **argv) {
