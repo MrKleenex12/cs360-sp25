@@ -20,9 +20,9 @@ typedef struct string_vector {
 } SV;
 
 void free_SV(SV *sv) {
-  // for(int i = 0; i < sv->size; i++) {
-  //   if(sv->arr[i] != NULL) free(sv->arr[i]);
-  // }
+  for(int i = 0; i < sv->size; i++) {
+    if(sv->arr[i] != NULL) free(sv->arr[i]);
+  }
   free(sv->arr);
   free(sv);
 }
@@ -60,28 +60,33 @@ void dir_dfs(const char *dir_name) {
   struct dirent *de;
   struct stat buf;
   int exists;
-  SV *sv = new_SV(); /* string vector */
+  SV *sv = new_SV();  /* string vector */
 
   while((de = readdir(d)) != NULL) {
+    /* n is name of current item in directory */
     char *n = de->d_name;
+    /* skip if . or .. directory */
     if(strcmp(n, ".") == 0 || strcmp(n, "..") == 0) continue; 
 
-    if(stat(n, &buf) == -1) {
+    /* read in file/directory name */
+    if(stat(n, &buf) < 0) {
       perror(n);
+      fprintf(stderr, "Error reading in %s\n", n);
       exit(1);
     }
 
-    /* Add to directory list to check later */
-    if(S_ISDIR(buf.st_mode)) { SV_append(sv, n); }
-    /* Print out file */
-    else { printf("FILE: %s\n", n); }
+    if(S_ISDIR(buf.st_mode)) { SV_append(sv, strdup(n)); }  /* IF dir, add to vector to check later*/
+    else { printf("FILE: %s\n", n); }               /* Print out file */
 
   }
-
+  
+  closedir(d);
+  /* Index through directories*/
   for(int i = 0; i < sv->size; i++) {
     printf("%s\n", sv->arr[i]);
+    dir_dfs(sv->arr[i]);
   }
-  closedir(d);
+
   free_SV(sv);
 }
 
