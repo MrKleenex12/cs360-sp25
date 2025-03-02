@@ -139,5 +139,6 @@ int main(int argc, char **argv) {
   inodes = make_jrb();
 
   open_dir(dir, path, inodes);
+  jrb_free_tree(inodes);
   return 0;
 }
