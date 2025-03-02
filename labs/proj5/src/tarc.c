@@ -12,7 +12,7 @@
 #include "sys/stat.h"
 
 #define BUF_SIZE 8192
-#define PATH_MAX 512 
+#define PATH_SIZE 512 
 #define INIT_ARR_SIZE 4 
 
 typedef struct string_vector {
@@ -53,17 +53,16 @@ void SV_append(SV *sv, char *str) {
   sv->vector[sv->size++] = strdup(str);  /* Append string to vector */
 }
 
-void read_dir(DIR *d, SV *sv, const char *dir_name) {
+void read_dir(DIR *d, SV *sv, const char *dir_name, char *path) {
   struct dirent *file;
   struct stat buf;
-  char path[PATH_MAX];
 
   while((file = readdir(d)) != NULL) {
     char *f = file->d_name;
     /* skip if . or .. directory */
     if(strcmp(f, ".") == 0 || strcmp(f, "..") == 0) continue; 
     /* Add file to path name */
-    snprintf(path, sizeof(path), "%s/%s", dir_name, f);
+    snprintf(path, PATH_SIZE, "%s/%s", dir_name, f);
 
     if(stat(path, &buf) < 0) {      /* read in filename */
       perror(path);
@@ -76,7 +75,7 @@ void read_dir(DIR *d, SV *sv, const char *dir_name) {
   }
 }
 
-void open_dir(const char *dir_name) {
+void open_dir(const char *dir_name, char *path) {
   printf("DIR: %s\n", dir_name);
   DIR *d = opendir(dir_name);
   if(d == NULL) {
@@ -85,18 +84,19 @@ void open_dir(const char *dir_name) {
   }
 
   SV *str_vec = new_SV();           /* Hold names of directories */
-  read_dir(d, str_vec, dir_name);   /* Print out files in directory */
+  read_dir(d, str_vec, dir_name, path);   /* Print out files in directory */
   closedir(d);                      /* Close current directory */
 
   /* Recursively print files in other directories */
   for(int i = 0; i < str_vec->size; i++) {
-    open_dir(str_vec->vector[i]);
+    open_dir(str_vec->vector[i], path);
   }
   free_SV(str_vec);
 }
 
 int main(int argc, char **argv) {
   char *dir = (argc > 1) ? argv[1] : ".";
-  open_dir(dir);
+  char path[PATH_SIZE];
+  open_dir(dir, path);
   return 0;
 }
