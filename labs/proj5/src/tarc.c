@@ -54,13 +54,13 @@ void SV_append(SV *sv, char *str) {
 }
 
 void process(struct stat *buf, const char *name, const char is_file, JRB printed) {
-  printf("size of file name: %lu\n", strlen(name));
+  printf("size of file name: 0x%04lx\n", strlen(name));
   printf("name: %s\n", name);
-  printf("inode: %llu\n", buf->st_ino);
+  printf("inode: 0x%08llx\n", buf->st_ino);
 
   if(printed == NULL) {
-    printf("Mode: %hx\n", buf->st_mode);
-    printf("Modification time: %ld\n", buf->st_mtime);
+    printf("Mode: 0x%04hx\n", buf->st_mode);
+    printf("Modification time: 0x%08lx\n", buf->st_mtime);
     if(is_file == 1) {
       FILE *file = fopen(name, "r"); 
       if(file == NULL) {
@@ -68,7 +68,7 @@ void process(struct stat *buf, const char *name, const char is_file, JRB printed
         exit(1);
       }
 
-      printf("file size: %lld\n", buf->st_size);
+      printf("file size: 0x%08llx\n", buf->st_size);
       int c;
       while((c = fgetc(file)) != EOF) { putchar(c); }
       fclose(file);
