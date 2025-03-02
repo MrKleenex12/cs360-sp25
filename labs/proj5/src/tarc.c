@@ -59,7 +59,7 @@ void process(struct stat *buf, const char *name, const char is_file, JRB printed
   printf("inode: %llu\n", buf->st_ino);
 
   if(printed == NULL) {
-    printf("Mode: %hu\n", buf->st_mode);
+    printf("Mode: %hx\n", buf->st_mode);
     printf("Modification time: %ld\n", buf->st_mtime);
     if(is_file == 1) {
       FILE *file = fopen(name, "r"); 
