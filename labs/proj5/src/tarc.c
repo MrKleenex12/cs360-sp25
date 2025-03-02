@@ -14,9 +14,41 @@
 #define BUF_SIZE 8192
 #define ARR_SIZE 10
 
-typedef struct char_vec {
-  int size;
-} CV;
+typedef struct string_vector {
+  int len, size;
+  char **arr;
+} SV;
+
+void free_SV(SV *sv) {
+  // for(int i = 0; i < sv->size; i++) {
+  //   if(sv->arr[i] != NULL) free(sv->arr[i]);
+  // }
+  free(sv->arr);
+  free(sv);
+}
+
+SV* new_SV() {
+  SV *sv = (SV*)malloc(sizeof(SV));
+  sv->arr = (char**)malloc(ARR_SIZE * sizeof(char*));
+  sv->len = ARR_SIZE;
+  sv->size = 0;
+
+  return sv;
+}
+
+void SV_append(SV *sv, char *str) {
+  if(sv->size == sv->len) {
+    sv->len += sv->len/2;
+    char **temp = (char**)realloc(sv->arr, sv->len * sizeof(char*));
+    if(temp == NULL) {
+      fprintf(stderr, "Realloc Failed\n");
+      exit(1);
+    }
+    sv->arr = temp;
+  } 
+
+  sv->arr[sv->size++] = str;
+}
 
 void dir_dfs(const char *dir_name) {
   DIR *d = opendir(dir_name);
@@ -28,8 +60,7 @@ void dir_dfs(const char *dir_name) {
   struct dirent *de;
   struct stat buf;
   int exists;
-  Dllist dirs, tmp;
-  dirs = new_dllist();
+  SV *sv = new_SV(); /* string vector */
 
   while((de = readdir(d)) != NULL) {
     char *n = de->d_name;
@@ -41,17 +72,17 @@ void dir_dfs(const char *dir_name) {
     }
 
     /* Add to directory list to check later */
-    if(S_ISDIR(buf.st_mode)) { dll_append(dirs, new_jval_s(n)); }
+    if(S_ISDIR(buf.st_mode)) { SV_append(sv, n); }
     /* Print out file */
     else { printf("FILE: %s\n", n); }
+
   }
 
-  dll_traverse(tmp, dirs) {
-    printf("%s\n", tmp->val.s);
+  for(int i = 0; i < sv->size; i++) {
+    printf("%s\n", sv->arr[i]);
   }
-
-  free_dllist(dirs);
   closedir(d);
+  free_SV(sv);
 }
 
 int main(int argc, char **argv) {
