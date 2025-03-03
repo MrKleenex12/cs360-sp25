@@ -84,6 +84,7 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
       /* Print out characters of file */
       size_t bytes_read;
       while((bytes_read = fread(name, 1, PATH_SIZE, file) > 0)) {
+        printf("bytes read: %zu\n", bytes_read);
         fwrite(name, 1, bytes_read, stdout);
       }
       fclose(file);
