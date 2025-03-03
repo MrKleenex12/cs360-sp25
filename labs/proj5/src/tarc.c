@@ -12,12 +12,11 @@
 #include "sys/stat.h"
 
 #define BUF_SIZE 8192
-#define INIT_ARR_SIZE 4 
 
-void general_info(struct stat *buf, char *str_buf) {
-  long len = strlen(str_buf);
+void general_info(struct stat *buf, char *str_buf, size_t *suffix) {
+  long len = strlen(str_buf+(*suffix));
   fwrite(&len, 4, 1, stdout);                   /* filename size */
-  fwrite(str_buf, strlen(str_buf), 1, stdout);  /* filename */
+  fwrite(str_buf+(*suffix), len, 1, stdout);  /* filename */
   fwrite(&(buf->st_ino), 8, 1, stdout);         /* inode */
 }
 
@@ -38,9 +37,9 @@ void file_info(struct stat *buf, char *str_buf) {
   fclose(file);
 }
 
-void print(struct stat *buf, char *str_buf, JRB inodes, const char is_file) {
+void print(struct stat *buf,char *str_buf, size_t *suffix, JRB inodes, const char is_file) {
   /* Print out details for all files and directories */
-  general_info(buf, str_buf);
+  general_info(buf, str_buf, suffix);
 
   /* Print extra info if first time encountering this inode */
   JRB tmp = jrb_find_dbl(inodes, buf->st_ino);
@@ -54,7 +53,7 @@ void print(struct stat *buf, char *str_buf, JRB inodes, const char is_file) {
   }
 }
 
-void read_files(DIR *dir, Dllist queue, char *dir_name, char *path, JRB inodes) {
+void read_files(DIR *dir, Dllist queue, char *dir_name, size_t *suffix, char *path, JRB inodes) {
   struct dirent *file;
   struct stat buf;
 
@@ -70,12 +69,12 @@ void read_files(DIR *dir, Dllist queue, char *dir_name, char *path, JRB inodes) 
       exit(1);
     }
     /* Print if file or Add to queue if directory */
-    if(S_ISREG(buf.st_mode)) { print(&buf, path, inodes, 1); }
+    if(S_ISREG(buf.st_mode)) { print(&buf, path, suffix, inodes, 1); }
     else { dll_append(queue, new_jval_s(strdup(path))); }
   }
 }
 
-void open_dir(char *dir_name, char *buffer, Dllist queue, JRB inodes) {
+void open_dir(char *dir_name, size_t *suffix, char *buffer, Dllist queue, JRB inodes) {
   /* Open and error check directory */
   DIR *dir = opendir(dir_name);
   if(dir == NULL) {
@@ -89,22 +88,30 @@ void open_dir(char *dir_name, char *buffer, Dllist queue, JRB inodes) {
     exit(1);
   }
 
-  print(&buf, dir_name, inodes, 0);                 /* Print out directory */ 
-  read_files(dir, queue, dir_name, buffer, inodes); /* Print out files in directory */
+  print(&buf, dir_name, suffix, inodes, 0);                 /* Print out directory */ 
+  read_files(dir, queue, dir_name, suffix, buffer, inodes); /* Print out files in directory */
   closedir(dir);                                    /* Close current DIR */
+}
+
+size_t cut_prefix(char *dir_name) {
+  size_t i;
+  for(i = strlen(dir_name)-1; i >= 0; i--) {
+    if(dir_name[i] == '/' ) { return i+1; } 
+  }
+  return 0;
 }
 
 void dir_search(char *dir_name, char *buffer, JRB inodes) {
   Dllist queue, tmp;
   queue = new_dllist();
-
+  size_t suffix = cut_prefix(dir_name);
 
   /* Add first */
   dll_append(queue, new_jval_s(strdup(dir_name)));
   /* Index through queue and open directories */
   while(dll_empty(queue) != 1) {
     tmp = dll_first(queue);
-    open_dir(tmp->val.s, buffer, queue, inodes);
+    open_dir(tmp->val.s, &suffix, buffer, queue, inodes);
     /* pop directory */
     free(tmp->val.s);
     dll_delete_node(tmp);
@@ -117,7 +124,7 @@ int main(int argc, char **argv) {
   char buffer[BUF_SIZE];
   JRB inodes;
   inodes = make_jrb();
-
+  
   dir_search(dir_name, buffer, inodes);
   jrb_free_tree(inodes);
 
