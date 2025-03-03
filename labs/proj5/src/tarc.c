@@ -53,21 +53,23 @@ void SV_append(SV *sv, char *str) {
   sv->vector[sv->size++] = strdup(str);
 }
 
-void print(struct stat *buf, const char *name, const char is_file, JRB list) {
+void print(struct stat *buf, char *name, const char is_file, JRB list) {
   /* Print info for all files */
   long len = strlen(name);
-  fwrite(&len, sizeof(len), 1, stdout);
+  fwrite(&len, 4, 1, stdout);
   // printf("name: %s\n", name);
   fwrite(name, strlen(name), 1, stdout);
   // printf("inode: 0x%016llx\n", buf->st_ino);
-  fwrite(&(buf->st_ino), sizeof(buf->st_ino), 1, stdout);
+  fwrite(&(buf->st_ino), 8, 1, stdout);
 
   /* Check if inode has been printed*/
   JRB tmp = jrb_find_dbl(list, buf->st_ino);
   if(tmp == NULL) {
     /* Print mode and modification */
-    printf("Mode: 0x%08hx\n", buf->st_mode);
-    printf("Modification time: 0x%016lx\n", buf->st_mtime);
+    // printf("Mode: 0x%08hx\n", buf->st_mode);
+    fwrite(&(buf->st_mode), 4, 1, stdout);
+    // printf("Modification time: 0x%016lx\n", buf->st_mtime);
+    fwrite(&(buf->st_mtime), 8, 1, stdout);
     /* Print size and bytes if file */
     if(is_file == 1) {
       FILE *file = fopen(name, "r"); 
@@ -76,10 +78,13 @@ void print(struct stat *buf, const char *name, const char is_file, JRB list) {
         exit(1);
       }
 
-      printf("file size: 0x%016llx\n", buf->st_size);
+      // printf("file size: 0x%016llx\n", buf->st_size);
+      fwrite(&(buf->st_size), 8, 1, stdout);
       /* Print out characters of file */
-      int c;
-      while((c = fgetc(file)) != EOF) { putchar(c); }
+      size_t bytes_read;
+      while((bytes_read = fread(name, PATH_SIZE, 1, file) > 0)) {
+        fwrite(name, bytes_read, 1, stdout);
+      }
       fclose(file);
     }
     /* Add inode into jrb */
@@ -88,7 +93,7 @@ void print(struct stat *buf, const char *name, const char is_file, JRB list) {
   printf("\n");
 }
 
-void read_dir(DIR *d, SV *sv, const char *dir_name, char *path, JRB list) {
+void read_dir(DIR *d, SV *sv, char *dir_name, char *path, JRB list) {
   struct dirent *file;
   struct stat buf;
 
@@ -109,7 +114,7 @@ void read_dir(DIR *d, SV *sv, const char *dir_name, char *path, JRB list) {
   }
 }
 
-void open_dir(const char *dir_name, char *path, JRB list) {
+void open_dir(char *dir_name, char *path, JRB list) {
   /* Open and error check directory */
   DIR *d = opendir(dir_name);
   if(d == NULL) {
