@@ -56,6 +56,7 @@ void SV_append(SV *sv, char *str) {
 void print(struct stat *buf, char *name, const char is_file, JRB list) {
   /* Print info for all files */
   long len = strlen(name);
+  printf("size of file name: 0x%08lx\n", strlen(name));
   // fwrite(&len, 4, 1, stdout);
   printf("name: %s\n", name);
   // fwrite(name, strlen(name), 1, stdout);
