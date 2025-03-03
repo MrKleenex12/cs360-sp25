@@ -73,7 +73,7 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
     // fwrite(&(buf->st_mtime), 8, 1, stdout);
     /* Print size and bytes if file */
     if(is_file == 1) {
-      FILE *file = fopen(name, "r"); 
+      FILE *file = fopen(name, "rb"); 
       if(file == NULL) {
         perror(name);
         exit(1);
