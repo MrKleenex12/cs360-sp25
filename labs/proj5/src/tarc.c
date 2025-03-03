@@ -56,11 +56,11 @@ void SV_append(SV *sv, char *str) {
 void print(struct stat *buf, char *name, const char is_file, JRB list) {
   /* Print info for all files */
   long len = strlen(name);
-  fwrite(&len, 4, 1, stdout);
-  // printf("name: %s\n", name);
-  fwrite(name, strlen(name), 1, stdout);
-  // printf("inode: 0x%016llx\n", buf->st_ino);
-  fwrite(&(buf->st_ino), 8, 1, stdout);
+  // fwrite(&len, 4, 1, stdout);
+  printf("name: %s\n", name);
+  // fwrite(name, strlen(name), 1, stdout);
+  printf("inode: 0x%016llx\n", buf->st_ino);
+  // fwrite(&(buf->st_ino), 8, 1, stdout);
 
   /* Check if inode has been printed*/
   JRB tmp = jrb_find_dbl(list, buf->st_ino);
