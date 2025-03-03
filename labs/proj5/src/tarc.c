@@ -12,114 +12,73 @@
 #include "sys/stat.h"
 
 #define BUF_SIZE 8192
-#define PATH_SIZE 512 
 #define INIT_ARR_SIZE 4 
 
-typedef struct string_vector {
-  int length;   /* Total Length Allocated */
-  int size;     /* Size of items in vector */
-  char **vector;
-} SV;
-
-void free_SV(SV *sv) {
-  for(int i = 0; i < sv->size; i++) { free(sv->vector[i]); }
-  free(sv->vector);
-  free(sv);
+void general_info(struct stat *buf, char *str_buf) {
+  long len = strlen(str_buf);
+  fwrite(&len, 4, 1, stdout);                   /* filename size */
+  fwrite(str_buf, strlen(str_buf), 1, stdout);  /* filename */
+  fwrite(&(buf->st_ino), 8, 1, stdout);         /* inode */
 }
 
-SV* new_SV() {
-  SV *sv = (SV*)malloc(sizeof(SV));
-  sv->vector = (char**)malloc(INIT_ARR_SIZE * sizeof(char*));
-  sv->length = INIT_ARR_SIZE;
-  sv->size = 0;
+void file_info(struct stat *buf, char *str_buf) {
+  FILE *file;
+  size_t bytes_read;
 
-  return sv;
-}
-
-void SV_append(SV *sv, char *str) {
-  /* Resize if vector full */
-  if(sv->size == sv->length) {
-    /* 1.5 times larger */
-    sv->length += sv->length/2;
-    /* Reallocate space for bigger vector */
-    char **temp = (char**)realloc(sv->vector, sv->length * sizeof(char*));
-    if(temp == NULL) {
-      fprintf(stderr, "Realloc Failed\n");
-      exit(1);
-    }
-    sv->vector = temp;
-  } 
-  /* Append string to vector */
-  sv->vector[sv->size++] = strdup(str);
-}
-
-void print(struct stat *buf, char *name, const char is_file, JRB list) {
-  /* Print info for all files */
-  long len = strlen(name);
-  // printf("size of file name: 0x%08lx\n", strlen(name));
-  fwrite(&len, 4, 1, stdout);
-  // printf("name: %s\n", name);
-  fwrite(name, strlen(name), 1, stdout);
-  // printf("inode: 0x%016llx\n", buf->st_ino);
-  fwrite(&(buf->st_ino), 8, 1, stdout);
-
-  /* Check if inode has been printed*/
-  JRB tmp = jrb_find_dbl(list, buf->st_ino);
-  if(tmp == NULL) {
-    /* Print mode and modification */
-    // printf("Mode: 0x%08hx\n", buf->st_mode);
-    fwrite(&(buf->st_mode), 4, 1, stdout);
-    // printf("Modification time: 0x%016lx\n", buf->st_mtime);
-    fwrite(&(buf->st_mtime), 8, 1, stdout);
-    /* Print size and bytes if file */
-    if(is_file == 1) {
-      FILE *file = fopen(name, "rb"); 
-      if(file == NULL) {
-        perror(name);
-        exit(1);
-      }
-
-      // printf("file size: 0x%016llx\n", buf->st_size);
-      fwrite(&(buf->st_size), 8, 1, stdout);
-      /* Print out characters of file */
-      size_t bytes_read;
-      while((bytes_read = fread(name, 1, PATH_SIZE, file)) > 0) {
-        // printf("bytes read: %zu\n", bytes_read);
-        fwrite(name, 1, bytes_read, stdout);
-      }
-      fclose(file);
-    }
-    /* Add inode into jrb */
-    jrb_insert_dbl(list, buf->st_ino, new_jval_i(0));
+  file = fopen(str_buf, "rb"); 
+  if(file == NULL) {
+    perror(str_buf);
+    exit(1);
   }
-  printf("\n");
+
+  fwrite(&(buf->st_size), 8, 1, stdout);        /* File's size */
+  while((bytes_read = fread(str_buf, 1, BUF_SIZE, file)) > 0) {
+    fwrite(str_buf, 1, bytes_read, stdout);     /* File's bytes */
+  }
+  fclose(file);
 }
 
-void read_dir(DIR *d, SV *sv, char *dir_name, char *path, JRB list) {
+void print(struct stat *buf, char *str_buf, JRB inodes, const char is_file) {
+  /* Print out details for all files and directories */
+  general_info(buf, str_buf);
+
+  /* Print extra info if first time encountering this inode */
+  JRB tmp = jrb_find_dbl(inodes, buf->st_ino);
+  if(tmp == NULL) {
+    fwrite(&(buf->st_mode), 4, 1, stdout);
+    fwrite(&(buf->st_mtime), 8, 1, stdout); 
+    /* If file, print file's size and bytes*/
+    if(is_file == 1) { file_info(buf, str_buf);}
+    /* Add inode into jrb */
+    jrb_insert_dbl(inodes, buf->st_ino, new_jval_i(0));
+  }
+}
+
+void read_files(DIR *dir, Dllist queue, char *dir_name, char *path, JRB inodes) {
   struct dirent *file;
   struct stat buf;
 
-  while((file = readdir(d)) != NULL) {
+  while((file = readdir(dir)) != NULL) {
     char *f = file->d_name;
     /* skip if . or .. directory */
-    if(strcmp(f, ".") == 0 || strcmp(f, "..") == 0) continue; 
-    /* Add file to path name */
-    snprintf(path, PATH_SIZE, "%s/%s", dir_name, f);
+    if(strcmp(f, ".") == 0 || strcmp(f, "..") == 0) { continue; }
+    /* Add file to path str_buf */
+    snprintf(path, BUF_SIZE, "%s/%s", dir_name, f);
     /* read in filename */
     if(stat(path, &buf) < 0) {
       perror(path);
       exit(1);
     }
-    /* If directory, add to vector to check later*/
-    if(S_ISDIR(buf.st_mode)) { SV_append(sv, path); }
-    else { print(&buf, path, 1, list); }
+    /* Print if file or Add to queue if directory */
+    if(S_ISREG(buf.st_mode)) { print(&buf, path, inodes, 1); }
+    else { dll_append(queue, new_jval_s(strdup(path))); }
   }
 }
 
-void open_dir(char *dir_name, char *path, JRB list) {
+void open_dir(char *dir_name, char *buffer, Dllist queue, JRB inodes) {
   /* Open and error check directory */
-  DIR *d = opendir(dir_name);
-  if(d == NULL) {
+  DIR *dir = opendir(dir_name);
+  if(dir == NULL) {
     perror(dir_name);
     exit(1);
   }
@@ -129,28 +88,37 @@ void open_dir(char *dir_name, char *path, JRB list) {
     perror(dir_name);
     exit(1);
   }
-  /* Hold names of directories */
-  SV *str_vec = new_SV();
-  print(&buf, dir_name, 0, list);
-  /* Print out files in directory */
-  read_dir(d, str_vec, dir_name, path, list);
-  /* Close current directory */
-  closedir(d);
 
-  /* Recursively print files in other directories */
-  for(int i = 0; i < str_vec->size; i++) {
-    open_dir(str_vec->vector[i], path, list);
+  print(&buf, dir_name, inodes, 0);                 /* Print out directory */ 
+  read_files(dir, queue, dir_name, buffer, inodes); /* Print out files in directory */
+  closedir(dir);                                    /* Close current DIR */
+}
+
+void dir_search(char *dir_name, char *buffer, JRB inodes) {
+  Dllist queue, tmp;
+  queue = new_dllist();
+
+
+  /* Add first */
+  dll_append(queue, new_jval_s(strdup(dir_name)));
+  /* Index through queue and open directories */
+  while(dll_empty(queue) != 1) {
+    tmp = dll_first(queue);
+    open_dir(tmp->val.s, buffer, queue, inodes);
+    /* pop directory */
+    free(tmp->val.s);
+    dll_delete_node(tmp);
   }
-  free_SV(str_vec);
+  free_dllist(queue);
 }
 
 int main(int argc, char **argv) {
-  char *dir = (argc > 1) ? argv[1] : ".";
-  char path[PATH_SIZE];
+  char *dir_name = (argc > 1) ? argv[1] : ".";
+  char buffer[BUF_SIZE];
   JRB inodes;
   inodes = make_jrb();
 
-  open_dir(dir, path, inodes);
+  dir_search(dir_name, buffer, inodes);
   jrb_free_tree(inodes);
 
   return 0;
