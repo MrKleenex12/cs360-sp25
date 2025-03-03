@@ -59,16 +59,16 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
   // fwrite(&len, 4, 1, stdout);
   printf("name: %s\n", name);
   // fwrite(name, strlen(name), 1, stdout);
-  printf("inode: 0x%016llx\n", buf->st_ino);
+  printf("inode: %lld\n", buf->st_ino);
   // fwrite(&(buf->st_ino), 8, 1, stdout);
 
   /* Check if inode has been printed*/
   JRB tmp = jrb_find_dbl(list, buf->st_ino);
   if(tmp == NULL) {
     /* Print mode and modification */
-    printf("Mode: 0x%08hx\n", buf->st_mode);
+    printf("Mode: %hd\n", buf->st_mode);
     // fwrite(&(buf->st_mode), 4, 1, stdout);
-    printf("Modification time: 0x%016lx\n", buf->st_mtime);
+    printf("Modification time: %ld\n", buf->st_mtime);
     // fwrite(&(buf->st_mtime), 8, 1, stdout);
     /* Print size and bytes if file */
     if(is_file == 1) {
@@ -78,7 +78,7 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
         exit(1);
       }
 
-      printf("file size: 0x%016llx\n", buf->st_size);
+      printf("file size: %lld\n", buf->st_size);
       // fwrite(&(buf->st_size), 8, 1, stdout);
       /* Print out characters of file */
       size_t bytes_read;
