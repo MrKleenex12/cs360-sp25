@@ -49,18 +49,26 @@ void SV_append(SV *sv, char *str) {
     }
     sv->vector = temp;
   } 
-
-  sv->vector[sv->size++] = strdup(str);  /* Append string to vector */
+  /* Append string to vector */
+  sv->vector[sv->size++] = strdup(str);
 }
 
-void process(struct stat *buf, const char *name, const char is_file, JRB printed) {
-  printf("size of file name: 0x%08lx\n", strlen(name));
-  printf("name: %s\n", name);
-  printf("inode: 0x%016llx\n", buf->st_ino);
-
-  if(printed == NULL) {
+void print(struct stat *buf, const char *name, const char is_file, JRB list) {
+  /* Print info for all files */
+  long len = strlen(name);
+  fwrite(&len, sizeof(len), 1, stdout);
+  // printf("name: %s\n", name);
+  fwrite(name, strlen(len), 1, stdout);
+  // printf("inode: 0x%016llx\n", buf->st_ino);
+  fwrite(&(buf->st_ino), sizeof(buf->st_ino), 1, stdout);
+  
+  /* Check if inode has been printed*/
+  JRB tmp = jrb_find_dbl(list, buf->st_ino);
+  if(tmp == NULL) {
+    /* Print mode and modification */
     printf("Mode: 0x%08hx\n", buf->st_mode);
     printf("Modification time: 0x%016lx\n", buf->st_mtime);
+    /* Print size and bytes if file */
     if(is_file == 1) {
       FILE *file = fopen(name, "r"); 
       if(file == NULL) {
@@ -69,10 +77,13 @@ void process(struct stat *buf, const char *name, const char is_file, JRB printed
       }
 
       printf("file size: 0x%016llx\n", buf->st_size);
+      /* Print out characters of file */
       int c;
       while((c = fgetc(file)) != EOF) { putchar(c); }
       fclose(file);
     }
+    /* Add inode into jrb */
+    jrb_insert_dbl(list, buf->st_ino, new_jval_i(0));
   }
   printf("\n");
 }
@@ -87,44 +98,37 @@ void read_dir(DIR *d, SV *sv, const char *dir_name, char *path, JRB list) {
     if(strcmp(f, ".") == 0 || strcmp(f, "..") == 0) continue; 
     /* Add file to path name */
     snprintf(path, PATH_SIZE, "%s/%s", dir_name, f);
-
-    if(stat(path, &buf) < 0) {      /* read in filename */
+    /* read in filename */
+    if(stat(path, &buf) < 0) {
       perror(path);
       exit(1);
     }
-
     /* If directory, add to vector to check later*/
     if(S_ISDIR(buf.st_mode)) { SV_append(sv, path); }
-    else {
-      JRB tmp = jrb_find_int(list, buf.st_ino);
-      process(&buf, path, 1, tmp);
-      if(tmp == NULL) { jrb_insert_int(list, buf.st_ino, new_jval_i(0)); }
-    }
+    else { print(&buf, path, 1, list); }
   }
 }
 
 void open_dir(const char *dir_name, char *path, JRB list) {
-  // printf("DIR: %s\n", dir_name);
+  /* Open and error check directory */
   DIR *d = opendir(dir_name);
   if(d == NULL) {
     perror(dir_name);
     exit(1);
   }
-
+  /* Open details of directory */
   struct stat buf;
   if(stat(dir_name, &buf) < 0) {
     perror(dir_name);
     exit(1);
   }
-
-  JRB tmp = jrb_find_int(list, buf.st_ino);
-  process(&buf, dir_name, 0, tmp);
-  if(tmp == NULL) { jrb_insert_int(list, buf.st_ino, new_jval_i(0)); }
-
-
-  SV *str_vec = new_SV();               /* Hold names of directories */
-  read_dir(d, str_vec, dir_name, path, list); /* Print out files in directory */
-  closedir(d);                          /* Close current directory */
+  /* Hold names of directories */
+  SV *str_vec = new_SV();
+  print(&buf, dir_name, 0, list);
+  /* Print out files in directory */
+  read_dir(d, str_vec, dir_name, path, list);
+  /* Close current directory */
+  closedir(d);
 
   /* Recursively print files in other directories */
   for(int i = 0; i < str_vec->size; i++) {
@@ -141,5 +145,6 @@ int main(int argc, char **argv) {
 
   open_dir(dir, path, inodes);
   jrb_free_tree(inodes);
+
   return 0;
 }
