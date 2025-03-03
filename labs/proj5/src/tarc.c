@@ -57,20 +57,20 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
   /* Print info for all files */
   long len = strlen(name);
   // printf("size of file name: 0x%08lx\n", strlen(name));
-  // fwrite(&len, 4, 1, stdout);
+  fwrite(&len, 4, 1, stdout);
   // printf("name: %s\n", name);
-  // fwrite(name, strlen(name), 1, stdout);
+  fwrite(name, strlen(name), 1, stdout);
   // printf("inode: 0x%016llx\n", buf->st_ino);
-  // fwrite(&(buf->st_ino), 8, 1, stdout);
+  fwrite(&(buf->st_ino), 8, 1, stdout);
 
   /* Check if inode has been printed*/
   JRB tmp = jrb_find_dbl(list, buf->st_ino);
   if(tmp == NULL) {
     /* Print mode and modification */
     // printf("Mode: 0x%08hx\n", buf->st_mode);
-    // fwrite(&(buf->st_mode), 4, 1, stdout);
+    fwrite(&(buf->st_mode), 4, 1, stdout);
     // printf("Modification time: 0x%016lx\n", buf->st_mtime);
-    // fwrite(&(buf->st_mtime), 8, 1, stdout);
+    fwrite(&(buf->st_mtime), 8, 1, stdout);
     /* Print size and bytes if file */
     if(is_file == 1) {
       FILE *file = fopen(name, "rb"); 
@@ -80,11 +80,11 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
       }
 
       // printf("file size: 0x%016llx\n", buf->st_size);
-      // fwrite(&(buf->st_size), 8, 1, stdout);
+      fwrite(&(buf->st_size), 8, 1, stdout);
       /* Print out characters of file */
       size_t bytes_read;
-      while((bytes_read = fread(name, 1, PATH_SIZE, file) > 0)) {
-        printf("bytes read: %zu\n", bytes_read);
+      while((bytes_read = fread(name, 1, PATH_SIZE, file)) > 0) {
+        // printf("bytes read: %zu\n", bytes_read);
         fwrite(name, 1, bytes_read, stdout);
       }
       fclose(file);
