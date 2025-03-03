@@ -83,7 +83,7 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
       /* Print out characters of file */
       size_t bytes_read;
       while((bytes_read = fread(name, PATH_SIZE, 1, file) > 0)) {
-        fwrite(name, bytes_read, 1, stdout);
+        fwrite(name, 1, bytes_read, stdout);
       }
       fclose(file);
     }
