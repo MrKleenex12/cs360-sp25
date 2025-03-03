@@ -66,10 +66,10 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
   JRB tmp = jrb_find_dbl(list, buf->st_ino);
   if(tmp == NULL) {
     /* Print mode and modification */
-    // printf("Mode: 0x%08hx\n", buf->st_mode);
-    fwrite(&(buf->st_mode), 4, 1, stdout);
-    // printf("Modification time: 0x%016lx\n", buf->st_mtime);
-    fwrite(&(buf->st_mtime), 8, 1, stdout);
+    printf("Mode: 0x%08hx\n", buf->st_mode);
+    // fwrite(&(buf->st_mode), 4, 1, stdout);
+    printf("Modification time: 0x%016lx\n", buf->st_mtime);
+    // fwrite(&(buf->st_mtime), 8, 1, stdout);
     /* Print size and bytes if file */
     if(is_file == 1) {
       FILE *file = fopen(name, "r"); 
@@ -78,8 +78,8 @@ void print(struct stat *buf, char *name, const char is_file, JRB list) {
         exit(1);
       }
 
-      // printf("file size: 0x%016llx\n", buf->st_size);
-      fwrite(&(buf->st_size), 8, 1, stdout);
+      printf("file size: 0x%016llx\n", buf->st_size);
+      // fwrite(&(buf->st_size), 8, 1, stdout);
       /* Print out characters of file */
       size_t bytes_read;
       while((bytes_read = fread(name, PATH_SIZE, 1, file) > 0)) {
