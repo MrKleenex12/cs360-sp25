@@ -16,7 +16,7 @@
 void general_info(struct stat *buf, char *str_buf, size_t *suffix) {
   long len = strlen(str_buf+(*suffix));
   fwrite(&len, 4, 1, stdout);                   /* filename size */
-  fwrite(str_buf+(*suffix), len, 1, stdout);  /* filename */
+  fwrite(str_buf+(*suffix), len, 1, stdout);    /* filename */
   fwrite(&(buf->st_ino), 8, 1, stdout);         /* inode */
 }
 
@@ -24,12 +24,12 @@ void file_info(struct stat *buf, char *str_buf) {
   FILE *file;
   size_t bytes_read;
 
-  file = fopen(str_buf, "rb"); 
-  if(file == NULL) {
+  /* Error check file */
+  if((file = fopen(str_buf, "rb"))== NULL) {
     perror(str_buf);
     exit(1);
   }
-
+  /* Write to stdou */
   fwrite(&(buf->st_size), 8, 1, stdout);        /* File's size */
   while((bytes_read = fread(str_buf, 1, BUF_SIZE, file)) > 0) {
     fwrite(str_buf, 1, bytes_read, stdout);     /* File's bytes */
@@ -37,7 +37,7 @@ void file_info(struct stat *buf, char *str_buf) {
   fclose(file);
 }
 
-void print(struct stat *buf,char *str_buf, size_t *suffix, JRB inodes, const char is_file) {
+void print(struct stat *buf,char *str_buf, size_t *suffix, JRB inodes) {
   /* Print out details for all files and directories */
   general_info(buf, str_buf, suffix);
 
@@ -47,7 +47,7 @@ void print(struct stat *buf,char *str_buf, size_t *suffix, JRB inodes, const cha
     fwrite(&(buf->st_mode), 4, 1, stdout);
     fwrite(&(buf->st_mtime), 8, 1, stdout); 
     /* If file, print file's size and bytes*/
-    if(is_file == 1) { file_info(buf, str_buf);}
+    if(S_ISREG(buf->st_mode)) { file_info(buf, str_buf);}
     /* Add inode into jrb */
     jrb_insert_dbl(inodes, buf->st_ino, new_jval_i(0));
   }
@@ -69,7 +69,7 @@ void read_files(DIR *dir, Dllist queue, char *dir_name, size_t *suffix, char *pa
       exit(1);
     }
     /* Print if file or Add to queue if directory */
-    if(S_ISREG(buf.st_mode)) { print(&buf, path, suffix, inodes, 1); }
+    if(S_ISREG(buf.st_mode)) { print(&buf, path, suffix, inodes); }
     else { dll_append(queue, new_jval_s(strdup(path))); }
   }
 }
@@ -87,13 +87,17 @@ void open_dir(char *dir_name, size_t *suffix, char *buffer, Dllist queue, JRB in
     perror(dir_name);
     exit(1);
   }
-
-  print(&buf, dir_name, suffix, inodes, 0);                 /* Print out directory */ 
-  read_files(dir, queue, dir_name, suffix, buffer, inodes); /* Print out files in directory */
-  closedir(dir);                                    /* Close current DIR */
+  snprintf(buffer, BUF_SIZE, "%s", dir_name);
+  /* Print out directory */ 
+  print(&buf, buffer, suffix, inodes);
+  /* Print out files in directory */
+  read_files(dir, queue, dir_name, suffix, buffer, inodes);
+  /* Close current DIR */
+  closedir(dir);
 }
 
 size_t cut_prefix(char *dir_name) {
+  /* Find index of last forward slash */
   size_t i;
   for(i = strlen(dir_name)-1; i >= 0; i--) {
     if(dir_name[i] == '/' ) { return i+1; } 
