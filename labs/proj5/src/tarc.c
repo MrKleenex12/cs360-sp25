@@ -1,3 +1,6 @@
+/*  Larry Wang - Lab-5 Tarc 
+    tarc.c takes a directory and prints out a tar file to stdout
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
