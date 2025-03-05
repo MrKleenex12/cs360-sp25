@@ -42,7 +42,7 @@ void read_tar() {
       fread(&itmp, 4, 1, stdin);
       printf("Mode %u ", itmp);
       fread(&ltmp, 8, 1, stdin);
-      printf("Mtime %ld\n", ltmp);
+      printf("Mtime %ld", ltmp);
 
       if((itmp >> 15 & 1) == 1) {
         fread(&ltmp, 8, 1, stdin);
@@ -52,7 +52,7 @@ void read_tar() {
       /* Add into list after */
       jrb_insert_dbl(inodes, in, new_jval_i(0));
     }
-    printf("\n");
+    printf("\n\n");
   }
   jrb_free_tree(inodes);
 }
