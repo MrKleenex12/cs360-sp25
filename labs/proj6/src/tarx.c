@@ -29,9 +29,7 @@ void read_tar() {
 
   JRB inodes, tmp;
   inodes = make_jrb();
-
   while(fread(&itmp, 4, 1, stdin) > 0) {
-    fread(&itmp, 4, 1, stdin);
     /* All files */
     fread(name, itmp, 1, stdin);
     name[itmp] = '\0';
