@@ -72,11 +72,12 @@ void first_read(Cbufs *cb, BSizes *bs, timeval *times) {
     creat(cb->name, bs->itmp);
     int fd = open(cb->name, O_WRONLY);
     int result = write(fd, cb->buffer, bs->fsize);
+    set_time(cb->name, times, &(bs->mtime));
   } 
   else {
     mkdir(cb->name, (bs->itmp));
+    set_time(cb->name, times, &(bs->mtime));
   }
-  set_time(cb->name, times, &(bs->mtime));
 }
 
 void read_tar() {
