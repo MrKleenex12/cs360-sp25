@@ -2,12 +2,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <jrb.h>
 #include <jval.h>
 
 #define BUF_SIZE 8192
+
+typedef struct char_buffers {
+  char buffer[BUF_SIZE];
+  char name[BUF_SIZE];
+} Cbufs;
+
+typedef struct byte_sizes {
+  long in, mtime, fsize;
+  u_int32_t itmp; 
+} BSizes;
+
+typedef struct timeval timeval;
 
 /*  Order of bytes:
 
@@ -24,44 +37,57 @@
     - file's bytes (contents)
 */
 
-void read_tar() {
-  char buffer[BUF_SIZE];
-  char name[BUF_SIZE];
-  long ltmp, in, mtime;
-  u_int32_t itmp; 
+void set_time(char *name, timeval *times, long *mtime) {
+  times[0].tv_usec = 0;
+  times[0].tv_sec = time(0);
+  times[1].tv_usec = 0;
+  times[1].tv_sec = *mtime;
+}
 
+void general_info(char *name, u_int32_t *itmp, long *in) {
+  fread(name, *itmp, 1, stdin);
+  name[*itmp] = '\0';
+  printf("Name: %s\n", name);
+  fread(in, 8, 1, stdin);
+  printf("Inode %ld ", *in);
+}
+
+void first_read(Cbufs *cb, BSizes *bs, timeval *times) {
+  fread(&(bs->itmp), 4, 1, stdin);
+  printf("Mode %o ", bs->itmp);
+  fread(&(bs->mtime), 8, 1, stdin);
+  printf("Mtime %ld", bs->mtime);
+  /* IF File and not Directory */
+  if(((bs->itmp) >> 15 & 1) == 1) {
+    fread(&(bs->fsize), 8, 1, stdin);
+    fread(cb->buffer, (bs->fsize), 1, stdin);
+  } else {
+    mkdir(cb->name, (bs->itmp));
+    set_time(cb->name, times, &(bs->mtime));
+  }
+}
+
+void read_tar() {
+  Cbufs cb;
+  BSizes bs;
   JRB inodes, tmp;
   inodes = make_jrb();
+  timeval times[2];
 
-
-  while(fread(&itmp, 4, 1, stdin) > 0) {
+  while(fread(&bs.itmp, 4, 1, stdin) > 0) {
     /* All files */
-    fread(name, itmp, 1, stdin);
-    name[itmp] = '\0';
-    printf("Name: %s\n", name);
-    fread(&in, 8, 1, stdin);
-    printf("Inode %ld ", in);
+    general_info(cb.name, &bs.itmp, &bs.in);
+
     /* IF first time seeing inode */
-    tmp = jrb_find_dbl(inodes, in);
-
+    tmp = jrb_find_dbl(inodes, bs.in);
     if(tmp == NULL) {
-      fread(&itmp, 4, 1, stdin);
-      printf("Mode %o ", itmp);
-      fread(&mtime, 8, 1, stdin);
-      printf("Mtime %ld", mtime);
-      /* IF File and not Directory */
-      if((itmp >> 15 & 1) == 1) {
-        fread(&ltmp, 8, 1, stdin);
-        fread(buffer, ltmp, 1, stdin);
-      } else {
-        mkdir(name, itmp);
-      }
-
-      /* Add into list after */
-      jrb_insert_dbl(inodes, in, new_jval_i(0));
+      first_read(&cb, &bs, times);                         /* Read in mode and mtime */
+      jrb_insert_dbl(inodes, bs.in, new_jval_i(0)); /* Add into list after */
     }
+
     printf("\n\n");
   }
+
   jrb_free_tree(inodes);
 }
 
