@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <jrb.h>
 #include <jval.h>
 
@@ -22,13 +25,15 @@
 */
 
 void read_tar() {
-  long ltmp, in;
-  u_int32_t itmp; 
   char buffer[BUF_SIZE];
   char name[BUF_SIZE];
+  long ltmp, in, mtime;
+  u_int32_t itmp; 
 
   JRB inodes, tmp;
   inodes = make_jrb();
+
+
   while(fread(&itmp, 4, 1, stdin) > 0) {
     /* All files */
     fread(name, itmp, 1, stdin);
@@ -38,20 +43,18 @@ void read_tar() {
     printf("Inode %ld ", in);
     /* IF first time seeing inode */
     tmp = jrb_find_dbl(inodes, in);
+
     if(tmp == NULL) {
       fread(&itmp, 4, 1, stdin);
       printf("Mode %o ", itmp);
-      fread(&ltmp, 8, 1, stdin);
-      printf("Mtime %ld", ltmp);
-
+      fread(&mtime, 8, 1, stdin);
+      printf("Mtime %ld", mtime);
+      /* IF File and not Directory */
       if((itmp >> 15 & 1) == 1) {
         fread(&ltmp, 8, 1, stdin);
         fread(buffer, ltmp, 1, stdin);
       } else {
-        strcpy(buffer, name);
-        printf("buffer: %s\n", buffer);
-        snprintf(name, BUF_SIZE, "mkdir %s", buffer);
-        system(name);
+        mkdir(name, itmp);
       }
 
       /* Add into list after */
