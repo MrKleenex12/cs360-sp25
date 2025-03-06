@@ -47,26 +47,36 @@ void set_time(char *name, timeval *times, long *mtime) {
 }
 
 void general_info(char *name, u_int32_t *itmp, long *in) {
-  fread(name, *itmp, 1, stdin);
+  /* All files */
+  fread(name, *itmp, 1, stdin);                 /* Size of filename */
+  fread(in, 8, 1, stdin);                       /* Name of file */
+
   name[*itmp] = '\0';
   printf("Name: %s\n", name);
-  fread(in, 8, 1, stdin);
   printf("Inode %ld ", *in);
 }
 
 void first_read(Cbufs *cb, BSizes *bs, timeval *times) {
-  fread(&(bs->itmp), 4, 1, stdin);
+  /* Read mode and Mtime */
+  fread(&(bs->itmp), 4, 1, stdin);              /* Mode */
+  fread(&(bs->mtime), 8, 1, stdin);             /* Mtime */
   printf("Mode %o ", bs->itmp);
-  fread(&(bs->mtime), 8, 1, stdin);
   printf("Mtime %ld", bs->mtime);
+
   /* IF File and not Directory */
   if(((bs->itmp) >> 15 & 1) == 1) {
-    fread(&(bs->fsize), 8, 1, stdin);
-    fread(cb->buffer, (bs->fsize), 1, stdin);
-  } else {
+    fread(&(bs->fsize), 8, 1, stdin);           /* Size of file */
+    fread(cb->buffer, (bs->fsize), 1, stdin);   /* File's contents */
+
+    /* Create file and put contents in it */
+    creat(cb->name, bs->itmp);
+    int fd = open(cb->name, O_WRONLY);
+    int result = write(fd, cb->buffer, bs->fsize);
+  } 
+  else {
     mkdir(cb->name, (bs->itmp));
-    set_time(cb->name, times, &(bs->mtime));
   }
+  set_time(cb->name, times, &(bs->mtime));
 }
 
 void read_tar() {
@@ -77,7 +87,6 @@ void read_tar() {
   timeval times[2];
 
   while(fread(&bs.itmp, 4, 1, stdin) > 0) {
-    /* All files */
     general_info(cb.name, &bs.itmp, &bs.in);
 
     /* IF first time seeing inode */
