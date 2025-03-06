@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <jrb.h>
 #include <jval.h>
+#include <fields.h>
 
 #define BUF_SIZE 8192
 
@@ -37,6 +38,12 @@ typedef struct timeval timeval;
     - file's size     - 8B long
     - file's bytes (contents)
 */
+int slash(const char *name) {
+  for(int i = strlen(name)-1; i >= 0; i--) {
+    if(name[i] == '/') { return i+1; }
+  }
+  return 0;
+}
 
 void set_time(char *name, timeval *times, long *mtime) {
   times[0].tv_usec = 0;
@@ -52,10 +59,12 @@ void general_info(char *name, u_int32_t *itmp, long *in) {
   fread(in, 8, 1, stdin);                       /* Name of file */
 
   name[*itmp] = '\0';
-  printf("Name: %s\n", name);
+  
+  printf("Name: %s\n", name+slash(name));
   printf("Inode %ld ", *in);
 }
 
+/* TODO Cleanup function? */
 void first_read(Cbufs *cb, BSizes *bs, timeval *times) {
   /* Read mode and Mtime */
   fread(&(bs->itmp), 4, 1, stdin);              /* Mode */
@@ -72,12 +81,13 @@ void first_read(Cbufs *cb, BSizes *bs, timeval *times) {
     creat(cb->name, bs->itmp);
     int fd = open(cb->name, O_WRONLY);
     int result = write(fd, cb->buffer, bs->fsize);
-    set_time(cb->name, times, &(bs->mtime));
+    close(fd);
   } 
   else {
+    /* TODO Make sure write protection is set after all subdirectories and files are created */
     mkdir(cb->name, (bs->itmp));
-    set_time(cb->name, times, &(bs->mtime));
   }
+  set_time(cb->name, times, &(bs->mtime));
 }
 
 void read_tar() {
@@ -105,5 +115,6 @@ void read_tar() {
 
 int main() {
   read_tar();
+  /* TODO Find a way to change working directories */
   return 0;
 }
