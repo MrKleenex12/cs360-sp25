@@ -42,6 +42,7 @@ void set_time(char *name, timeval *times, long *mtime) {
   times[0].tv_sec = time(0);
   times[1].tv_usec = 0;
   times[1].tv_sec = *mtime;
+  utimes(name, times);
 }
 
 void general_info(char *name, u_int32_t *itmp, long *in) {
