@@ -71,13 +71,8 @@ void DN_append(DNV *dnv, Dnode *dir_node) {
 
 
 void set_time(char *fname, long *mtime) {
-  timeval t[2];
-  t[0].tv_sec = 0;
-  t[0].tv_usec = 0;
-  t[1].tv_sec = *mtime;
-  t[1].tv_usec = 0;
+  timeval t[2] = {{0,0}, {*mtime,0}};
   utimes(fname, t);
-  
 }
 
 void general_info(Gvars *gv) {
@@ -171,9 +166,9 @@ void correct_dirs(DNV *dnv) {
 int main() {
   Gvars gv;
   JRB inodes, tmp;
+  inodes = make_jrb();
   DNV *dnv = make_DNV();
   size_t bytes_read;
-  inodes = make_jrb();
 
   /* Continously read through all of stdin */
   while((bytes_read = fread(&gv.itmp, 1, 4, stdin)) == 4) {
