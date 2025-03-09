@@ -6,111 +6,197 @@
 #include <time.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <jrb.h>
-#include <jval.h>
-#include <fields.h>
+#include "jrb.h"
+#include "jval.h"
+#include "dllist.h"
 
-#define BUF_SIZE 1012
-
-typedef struct char_buffers {
-  char buffer[BUF_SIZE];
-  char fname[BUF_SIZE];
-  char last_dir[BUF_SIZE];
-} CBufs;
-
-typedef struct byte_sizes {
-  long in, mtime, fsize, last_mtime;
-  u_int32_t itmp, last_mode; 
-} BSizes;
+#define BUF_SIZE 4096
+#define INIT_ARR_SIZE 4
 
 typedef struct timeval timeval;
 
-int slash(const char *fname) {
-  for(int i = strlen(fname)-1; i >= 0; i--) {
-    if(fname[i] == '/') { return i+1; }
+typedef struct global_vars {
+  char buffer[BUF_SIZE];
+  char fname[BUF_SIZE];
+  long in, mtime, fsize;
+  u_int32_t itmp; 
+} Gvars;
+
+/****************************** My own vector ******************************/
+typedef struct directory_node {
+  char *dir_name;
+  long mtime;
+  u_int32_t mode;
+} Dnode; 
+
+typedef struct DN_vector {
+  int length;   /* Total Length Allocated */
+  int size;     /* Size of items in vector */
+  Dnode **vector;
+} DNV;
+
+void free_DNV(DNV *dnv) {
+  for(int i = 0; i < dnv->size; i++) {
+    free(dnv->vector[i]->dir_name);
+    free(dnv->vector[i]);
   }
-  return 0;
+  free(dnv->vector);
+  free(dnv);
 }
 
-void set_time(char *fname, timeval *times, long *mtime) {
-  times[0].tv_usec = 0;
-  times[0].tv_sec = time(0);
-  times[1].tv_usec = 0;
-  times[1].tv_sec = *mtime;
-  utimes(fname, times);
+DNV* make_DNV() {
+  DNV *dnv = (DNV*)malloc(sizeof(DNV));
+  dnv->vector = (Dnode**)malloc(INIT_ARR_SIZE * sizeof(Dnode*));
+  dnv->length = INIT_ARR_SIZE;
+  dnv->size = 0;
+  return dnv;
 }
 
-void all_info(char *fname, u_int32_t *itmp, long *in) {
-  fread(fname, *itmp, 1, stdin);                /* Size of filename */
-  fread(in, 8, 1, stdin);                       /* Name of file */
-  fname[*itmp] = '\0';
+void DN_append(DNV *dnv, Dnode *dir_node) {
+  /* Resize if vector full */
+  if(dnv->size == dnv->length) {
+    /* 1.5 times larger */
+    dnv->length += dnv->length/2;
+    /* Reallocate space for bigger vector */
+    Dnode **temp = (Dnode**)realloc(dnv->vector, dnv->length * sizeof(Dnode*));
+    if(temp == NULL) {
+      fprintf(stderr, "Realloc Failed\n");
+      exit(1);
+    }
+    dnv->vector = temp;
+  } 
+  /* Append string to vector */
+  dnv->vector[dnv->size++] = dir_node;
 }
 
-void create_file(CBufs *cb, BSizes *bs) {
-  FILE *file = fopen(cb->fname, "w+");
-  fwrite(cb->buffer, bs->fsize, 1, file);
-  chmod(cb->fname, bs->itmp);
+
+void set_time(char *fname, long *mtime) {
+  timeval t[2];
+  t[0].tv_sec = 0;
+  t[0].tv_usec = 0;
+  t[1].tv_sec = *mtime;
+  t[1].tv_usec = 0;
+  utimes(fname, t);
+  
+}
+
+void general_info(Gvars *gv) {
+  size_t nobjects;
+
+  /* Name of file */
+  if((nobjects = fread(gv->fname, 1, gv->itmp, stdin)) < gv->itmp) {
+    fprintf(stderr, "Erro\n");
+    exit(1);
+  }
+  /* Inode */
+  if((nobjects = fread(&(gv->in), 1, 8, stdin)) < 8) {
+    fprintf(stderr, "Erro\n");
+    exit(1);
+  }
+  gv->fname[gv->itmp] = '\0';
+}
+
+void create_file(Gvars *gv) {
+  FILE *file;
+  size_t nobjects;
+
+  file = fopen(gv->fname, "wx");
+  if(file == NULL) {
+    perror(gv->fname);
+    exit(1);
+  }
+  nobjects = fwrite(gv->buffer, 1, gv->fsize, file);
+  if(nobjects < gv->fsize) {
+    fprintf(stderr, "Cannot write to %s\n", gv->fname);
+    exit(1);
+  }
+  chmod(gv->fname, gv->itmp);
   fclose(file);
 }
 
-void first_read(CBufs *cb, BSizes *bs, timeval *times) {
-  /* Read mode and Mtime */
-  fread(&(bs->itmp), 4, 1, stdin);              /* Mode */
-  fread(&(bs->mtime), 8, 1, stdin);             /* Mtime */
+Dnode* new_DN(char *dir_name, u_int32_t *mode, long *mtime) {
+  Dnode *dn = (Dnode*)malloc(sizeof(Dnode));
+  dn->dir_name = strdup(dir_name);
+  dn->mode = *mode;
+  dn->mtime = *mtime;
 
-  /* IF File */
-  if(((bs->itmp) >> 15 & 1) == 1) {
-    fread(&(bs->fsize), 8, 1, stdin);           /* Size of file */
-    fread(cb->buffer, (bs->fsize), 1, stdin);   /* File's contents */
-    create_file(cb, bs);                        /* Create file & contents */
-  } 
-  else {
-    /*
-    if(cb->last_dir[0] != '\0') {
-      chmod(cb->last_dir, bs->last_mode);
-      set_time(cb->last_dir, times, &(bs->last_mtime));
-    }
-    */
-
-    mkdir(cb->fname, 16877);
-    /*
-    strcmp(cb->last_dir, cb->fname);
-    bs->last_mode = bs->itmp;
-    bs->last_mtime = bs->mtime;
-    */
-  }
-  set_time(cb->fname, times, &(bs->mtime));
+  return dn;
 }
 
-
-void read_tar() {
-  CBufs cb;
-  BSizes bs;
-  JRB inodes, tmp;
-  inodes = make_jrb();
-  timeval times[2];
-
-  /* Continously read through all of stdin */
-  while(fread(&bs.itmp, 4, 1, stdin) > 0) {
-    all_info(cb.fname, &bs.itmp, &bs.in);
-
-    tmp = jrb_find_dbl(inodes, bs.in);
-    if(tmp == NULL) {
-      first_read(&cb, &bs, times);
-      /* Add into list after */
-      Jval j = new_jval_s(strdup(cb.fname));
-      jrb_insert_dbl(inodes, bs.in, j);                    
-    }
-    else { link(tmp->val.s, cb.fname); }
+void first_read(Gvars *gv, DNV *dnv) {
+  size_t nobjects;
+  /* Read mode and Mtime */
+  if((nobjects = fread(&(gv->itmp), 1, 4, stdin)) < 4) {
+    fprintf(stderr, "Erro\n");
+    exit(1);
   }
-  /* Set all directory modes */
-  /* Free JRB */
-  jrb_traverse(tmp, inodes) { free(tmp->val.s); }
-  jrb_free_tree(inodes);
+  if((nobjects = fread(&(gv->mtime), 1,  8, stdin)) < 8) {
+    fprintf(stderr, "Erro\n");
+    exit(1);
+  } 
+
+  /* IF File */
+  if(((gv->itmp) >> 15 & 1) == 1) {
+    /* Size of file */
+    if((nobjects = fread(&(gv->fsize), 1, 8, stdin)) < 8) {
+      fprintf(stderr, "Erro\n");
+      exit(1);
+    }
+    /* File's contents */
+    if((nobjects = fread(gv->buffer, 1, gv->fsize, stdin)) < gv->fsize) {
+      fprintf(stderr, "Erro\n");
+      exit(1);
+    }
+
+    /* Create file & contents */
+    create_file(gv);
+    set_time(gv->fname, &(gv->mtime));
+  } 
+  else {
+    mkdir(gv->fname, 16877);
+    Dnode *dn = new_DN(gv->fname, &(gv->itmp), &(gv->mtime));
+    DN_append(dnv, dn);
+  }
+}
+
+void correct_dirs(DNV *dnv) {
+  for(int i = dnv->size-1; i >= 0; i--) {
+    Dnode *dn = dnv->vector[i];
+    chmod(dn->dir_name, dn->mode);
+    set_time(dn->dir_name, &(dn->mtime));
+  }
+  free_DNV(dnv);
 }
 
 int main() {
-  read_tar();
-  /* TODO Find a way to change working directories */
+  Gvars gv;
+  JRB inodes, tmp;
+  DNV *dnv = make_DNV();
+  size_t bytes_read;
+  inodes = make_jrb();
+
+  /* Continously read through all of stdin */
+  while((bytes_read = fread(&gv.itmp, 1, 4, stdin)) == 4) {
+    general_info(&gv);
+
+    tmp = jrb_find_dbl(inodes, gv.in);
+    if(tmp == NULL) {
+      first_read(&gv, dnv);
+      /* Add into list after */
+      Jval j = new_jval_s(strdup(gv.fname));
+      jrb_insert_dbl(inodes, gv.in, j);                    
+    }
+    else { link(tmp->val.s, gv.fname); }
+  }
+
+  if(bytes_read > 0) {
+    fprintf(stderr, "Error Reading bits\n");
+    exit(1);
+  }
+
+  correct_dirs(dnv); 
+  /* Free JRB */
+  jrb_traverse(tmp, inodes) { free(tmp->val.s); }
+  jrb_free_tree(inodes);
   return 0;
 }
