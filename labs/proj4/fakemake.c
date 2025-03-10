@@ -208,12 +208,21 @@ void E_check(MF *m, Dllist tmp, const UL obj_time) {
 }
 
 int main(int argc, char **argv) {
-  /* Reading in through argv or stdin */
-  IS is = (argc == 2) ? new_inputstruct(argv[1]) : new_inputstruct(NULL);
-  if(!is && argc == 2) {
-    perror(argv[1]);
+  /* Error Check */
+  if(argc > 2) {
+    fprintf(stderr, "usage: ./fakemake <fmakefile>");
     return 1;
   }
+
+  IS is;
+  if(argc == 2) { is = new_inputstruct(argv[1]); }
+  else if(argc == 1) {
+    struct stat buf;
+    if(stat("fmakefile", &buf) == 0) {
+      is = new_inputstruct("fmakefile");
+    }
+  }
+  else { exit(1); }
   
   MF *m = new_make();
   Dllist tmp;
