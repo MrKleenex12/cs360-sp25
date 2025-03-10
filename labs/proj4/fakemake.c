@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "fields.h"
 #include "dllist.h"
 #include "jval.h"
@@ -90,6 +91,10 @@ int read_file(IS is, MF *m) {
         dll_append(m->list[index], new_jval_s(strdup(is->fields[i])));
       }
     } else { /* If E */
+      if(foundE == 1) {
+        fprintf(stderr, "fmakefile (%d) cannot have more than one E line\n", is->line);
+        exit(1);
+      }
       foundE = 1;
       m->exectuable = strdup(is->fields[1]);
     }
@@ -145,8 +150,11 @@ void O_compile(MF *m, Dllist tmp, char *cfile) {
   u_int32_t len = 0;
   char *call = base_call(m->list[2], tmp, &len, "gcc -c");
   call = new_call(call, &len, cfile);       /* Realloc space for call and create string */
-  system(call);                             /* System call to make files */
   printf("%s\n", call);
+  if(system(call) != 0) {                   /* System call to make files */
+    fprintf(stderr, "Command failed.  Exiting\n");
+    exit(1);
+  }
   free(call);
 }
 
@@ -159,12 +167,11 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
   /* Check C files*/
   dll_traverse(tmp, m->list[0]) {
     cfile = tmp->val.s;
-    
     /* Find time of C file */
     exists = stat(cfile, &buf);
     if(exists >= 0) { ctime = buf.st_mtime;}
     else {
-      fprintf(stderr, "%s not available,\n", cfile);
+      fprintf(stderr, "fmakefile: %s: No such file or directory\n", cfile);
       return -1;
     }
     /* Stat .o file corresponding with C file */
@@ -176,6 +183,7 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
     if(exists < 0 || otime < ctime || otime < *max_htime) {
       dll_append(m->objs, new_jval_s(ofile));
       O_compile(m, tmp, cfile);
+      *max_obj_time = time(0);
     }
     else { free(ofile); }
   }
@@ -185,15 +193,19 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
 
 void E_compile(MF *m, Dllist tmp) {
   u_int32_t len = 0;
-  char *call = base_call(m->list[2], tmp, &len, "gcc");   /* Add flags before -o */
-  call = new_call(call, &len, "-o");                      /* Add -o */ 
-  call = new_call(call, &len, m->exectuable);             /* Add executable */
+  char *call = (char*)malloc(100 * sizeof(char));
+  sprintf(call, "%s %s", "gcc -o", m->exectuable);
+  len = strlen(call);
+  call = base_call(m->list[2], tmp, &len, call);
   /* Add all obj files to call */
   dll_traverse(tmp, m->objs) { call = new_call(call, &len, tmp->val.s); } 
   /* Add any libraries */
   dll_traverse(tmp, m->list[3]) { call = new_call(call, &len, tmp->val.s); }
   printf("%s\n", call);
-  system(call);                                           /* Make executable */
+  if(system(call) != 0) {                                 /* Make executable */
+    fprintf(stderr, "Command failed.  Fakemake exiting\n");
+    exit(1);
+  }
   free(call);
 }
 
@@ -204,7 +216,19 @@ void E_check(MF *m, Dllist tmp, const UL obj_time) {
 
   exists = stat(m->exectuable, &buf);
   exe_time = buf.st_mtime;
-  if(exists < 0 || exe_time < obj_time) { E_compile(m, tmp); }
+  if(exists < 0 || exe_time < obj_time) {
+    free_dllist(m->objs);
+    Dllist all_objs = new_dllist();
+    dll_traverse(tmp, m->list[0]) {
+      dll_append(all_objs, new_jval_s(to_obj(tmp->val.s)));
+    }
+    m->objs = all_objs;
+
+    E_compile(m, tmp);
+  }
+  else {
+    printf("%s up to date\n", m->exectuable);
+  }
 }
 
 int main(int argc, char **argv) {
@@ -230,7 +254,7 @@ int main(int argc, char **argv) {
   int result = read_file(is, m);         /* Check if executable was in file*/
   /* Error Check */
   if(result == -1 || result == 0) {
-    char *str = (result == 0) ? "No executable Found" : "Bad File";
+    char *str = (result == 0) ? "No executable specified" : "Bad File";
     fprintf(stderr, "%s\n", str);
     delete_everything(m, tmp, is);
     return 1;
@@ -242,7 +266,6 @@ int main(int argc, char **argv) {
 
   /* Error Check */
   if(result == -1) {
-    fprintf(stderr, "Error reading source files\n");
     delete_everything(m, tmp, is);
     return 1;
   }
