@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include "jrb.h"
 #include "jval.h"
-#include "dllist.h"
 
 #define BUF_SIZE 4096
 #define INIT_ARR_SIZE 4
