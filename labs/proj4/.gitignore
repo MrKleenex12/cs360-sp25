@@ -1,6 +1,7 @@
 bin/*
 !bin/.keep
 .vscode
+fakemake
 grade*
 index.html
 makefile
@@ -9,3 +10,4 @@ lab-testing
 mysort
 mysort.fm
 f
+*.dSYM

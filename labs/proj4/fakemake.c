@@ -194,7 +194,7 @@ int S_check(MF *m, Dllist tmp, const UL *max_htime, UL *max_obj_time) {
 void E_compile(MF *m, Dllist tmp) {
   u_int32_t len = 0;
   char *call = (char*)malloc(100 * sizeof(char));
-  sprintf(call, "%s %s", "gcc -o", m->exectuable);
+  snprintf(call, 100, "%s %s", "gcc -o", m->exectuable);
   len = strlen(call);
   call = base_call(m->list[2], tmp, &len, call);
   /* Add all obj files to call */
