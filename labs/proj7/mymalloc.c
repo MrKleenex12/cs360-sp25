@@ -1,4 +1,5 @@
 #include "mymalloc.h"
+
 #include <unistd.h>
 
 /* 
@@ -22,8 +23,22 @@
     is bigger than 8192, call sbrk(10000). Put the number 10000 at 
     address 0x10800 and return 0x10808 to the user.
 */
-void *my_malloc(size_t size) {
 
+/* Singular global variable */
+void *head = NULL;
+
+typedef struct flist {
+  int size;
+  struct flist *flink;
+  struct flist *blink;
+} *Flist;
+
+void *my_malloc(size_t size) {
+  if(head == NULL) {
+    if(size <= 8192) { size = 8192; }
+    head = sbrk(size);
+    printf("head: 0x%lx\n", (unsigned long) head);
+  }
 }
 
 void my_free(void *ptr) {
