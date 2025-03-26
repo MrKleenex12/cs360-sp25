@@ -11,9 +11,15 @@ typedef struct flist {
   struct flist *blink;
 } *Flist;
 
-void print_Flist(Flist f, char *name) {
+void Print(Flist f, char *name) {
   printf("%s: 0x%08lx s: %d f: 0x%08lx b: 0x%08lx\n", 
     name, (UL)f, f->size, (UL)f->flink, (UL)f->blink);
+}
+
+void set_flist(Flist *f, const int size, Flist forw, Flist backw) {
+  (*f)->size = size;
+  (*f)->flink = forw;
+  (*f)->blink = backw;
 }
 
 /* Searches through list for chunk of memory that is big enough */
@@ -26,19 +32,18 @@ void *find_chunk(Flist h, size_t s) {
   return NULL;  /* return if no chunks found */
 }
 
-void *split(Flist *f, size_t s) {
-  void *ret;
-  int tmp;
+void *split(void *ptr, size_t s) {
+  Flist f, rem;
+  f = (Flist)ptr;
 
-  /* Set up bookkeeping and memory to be returned */
-  tmp = (*f)->size;
-  (*f)->size = s;
-  ret = head+8;
-  /* Adjust head and empty memory */
-  (*f) = (Flist)(head += s);
-  (*f)->size = tmp - s; 
-
-  return ret;
+  /* Set up Flist after split */
+  rem = (Flist)(ptr + s);
+  rem->size = f->size - s;
+  rem->flink = f->flink;
+  rem->blink = f->blink;
+  if(ptr == head) { head = (void*) rem; }
+  
+  return ptr + 8;
 }
 
 void *my_malloc(size_t s) {
@@ -53,18 +58,21 @@ void *my_malloc(size_t s) {
     *h = 8192;
   }
   f = (Flist)head;
-  print_Flist(f, "head");
+  Print(f, "head");
   
   /* Pad s to 8 bytes and add 8 for bookkeeping*/
-  if((tmp = s % 8) != 0) { s += (8-tmp); }
-  s += 8;
+  if((tmp = s % 8) != 0) { s += (8-tmp) + 8; }
+
   /* Find empty chunk of memory big enough for what is requested */
   f = find_chunk(f, s);
   if(f == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
-  /* TODO Split memory chunk in two if bigger than requested */
-  ret = split(&f, s);
+  // Print(f, "found chunk");
 
-  print_Flist(f, "new head");
+  /* TODO Split memory chunk in two if bigger than requested */
+  ret = split(f, s);
+
+  f = head;
+  Print(f, "new head");
   printf("\n");
 
   return ret;
@@ -85,8 +93,8 @@ void my_free(void *ptr) {
   new->blink = NULL;
   old->blink = new;
 
-  print_Flist(new, "new head");
-  print_Flist(old, "old head");
+  Print(new, "new head");
+  Print(old, "old head");
 }
 
 void *free_list_begin() {
