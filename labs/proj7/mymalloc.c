@@ -41,8 +41,12 @@ void *split(void *ptr, size_t s) {
   rem->size = f->size - s;
   rem->flink = f->flink;
   rem->blink = f->blink;
+  f->size = s;
+
   if(ptr == head) { head = (void*) rem; }
   
+  Print(f, "f");
+  Print(rem, "rem");
   return ptr + 8;
 }
 
@@ -61,8 +65,8 @@ void *my_malloc(size_t s) {
   Print(f, "head");
   
   /* Pad s to 8 bytes and add 8 for bookkeeping*/
-  if((tmp = s % 8) != 0) { s += (8-tmp) + 8; }
-
+  if((tmp = s % 8) != 0) { s += (8-tmp); }
+  s += 8;
   /* Find empty chunk of memory big enough for what is requested */
   f = find_chunk(f, s);
   if(f == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
@@ -95,6 +99,7 @@ void my_free(void *ptr) {
 
   Print(new, "new head");
   Print(old, "old head");
+  printf("\n");
 }
 
 void *free_list_begin() {
