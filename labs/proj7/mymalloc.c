@@ -3,7 +3,7 @@
 
 typedef unsigned long UL;
 
-void *malloc_head = NULL;    /* Singular global variable */
+void *malloc_head = NULL;    // Singular global variable
 
 typedef struct flist {
   int size;
@@ -16,17 +16,17 @@ void Print(Flist f, char *name) {
     name, (UL)f, f->size, (UL)f->flink, (UL)f->blink);
 }
 
-/* Searches through list for chunk of memory that is big enough */
+// Searches through list for chunk of memory that is big enough
 void *find_chunk(Flist h, size_t s) {
   Flist f = h;
   while(f != NULL) {
     if(s <= f->size) { return f; }
     f = f->flink;
   }
-  return NULL;  /* return if no chunks found */
+  return NULL;  // return if no chunks found
 }
 
-void *split(void *ptr, size_t s) {
+void split(void *ptr, size_t s) {
   Flist f = (Flist)ptr;
   Flist rem = NULL;
   
@@ -34,56 +34,49 @@ void *split(void *ptr, size_t s) {
   if((s + 8) < f->size) {
     rem = (Flist)(ptr + s);
     rem->size = f->size - s;
-  }
-  else { rem = f->flink; }
+  } else { rem = f->flink; }
 
   // Correctly adjust pointers
-  if(ptr != free_list_begin()) {
+  if(ptr != free_list_begin()) { 
     f->blink->flink = rem;
-    rem->blink = f->blink;
-  }
+    rem->blink = f->blink; }
   else {
     malloc_head = (void*) rem;
-    rem->blink = NULL;
-  }
+    rem->blink = NULL; }
   f->size = s;
 
   
   Print(f, "f");
   if(rem != NULL) Print(rem, "rem");
-  return ptr + 8;
 }
 
 void *my_malloc(size_t s) {
-  Flist f;
-  void *ret = NULL;
-  int tmp;
+  Flist start, ret;
 
-  /* Create heap if heap is null */
+  // Create heap if heap is null
   if(free_list_begin() == NULL) {
     malloc_head = sbrk(8192);
     int *h = (int*) malloc_head;
     *h = 8192;
   }
-  f = (Flist)malloc_head;
-  Print(f, "malloc_head");
+  start = (Flist)malloc_head;
+  Print(start, "malloc_head");
   
-  /* Pad s to 8 bytes and add 8 for bookkeeping*/
-  if((tmp = s % 8) != 0) { s += (8-tmp); }
-  s += 8;
-  /* Find empty chunk of memory big enough for what is requested */
-  f = find_chunk(f, s);
-  if(f == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
+  // Pad s to 8 bytes and add 8 for bookkeeping
+  s = (s + 7 + 8) & -8;
+  // Find empty chunk of memory big enough for what is requested
+  ret = find_chunk(start, s);
+  if(ret == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
   // Print(f, "found chunk");
 
-  /* Split memory chunk in two if bigger than requested */
-  ret = split(f, s);
+  // Split memory chunk in two if bigger than requested
+  split(ret, s);
 
-  f = (Flist)free_list_begin();
-  Print(f, "new malloc_head");
+  start = (Flist)free_list_begin();
+  Print(start, "new malloc_head");
   printf("\n");
 
-  return ret;
+  return ((void*)ret + 8);
 }
 
 void my_free(void *ptr) {
@@ -96,6 +89,7 @@ void my_free(void *ptr) {
     add_in->flink = begin;
     add_in->blink = NULL;
     begin->blink = add_in;
+    // Update flist start
     malloc_head = add_in;
   } 
   else {
