@@ -8,72 +8,80 @@ void *malloc_head = NULL;    // Singular global variable
 typedef struct flist {
   int size;
   struct flist *flink;
-  struct flist *blink;
 } *Flist;
 
-void Print(Flist f, char *name) {
-  printf("%s: 0x%08lx s: %d f: 0x%08lx b: 0x%08lx\n", 
-    name, (UL)f, f->size, (UL)f->flink, (UL)f->blink);
+void Print(void *ptr, char *name) {
+  Flist f = (Flist)ptr; 
+  printf("%s: 0x%08lx s: %d f: 0x%08lx\n", 
+    name, (UL)f, f->size, (UL)f->flink);
 }
 
-// Searches through list for chunk of memory that is big enough
-void *find_chunk(Flist h, size_t s) {
-  Flist f = h;
+// Searches through list for ret of memory that is big enough
+void *find_chunk(void *ptr, size_t s) {
+  Flist f = (Flist)ptr;
+  Flist before = f;
+
+  // returns one flist node before found chunk to help with removal
   while(f != NULL) {
-    if(s <= f->size) { return f; }
+    if(s <= f->size) { return before; }
+    before = f;
     f = f->flink;
   }
   return NULL;  // return if no chunks found
 }
 
-void split(void *ptr, size_t s) {
+void split(void *ptr, void *before, size_t s) {
   Flist f = (Flist)ptr;
   Flist rem = NULL;
   
-  //  Check if chunk can be split up
+  //  Check whether to split up chunk or just remove it
   if((s + 8) < f->size) {
     rem = (Flist)(ptr + s);
     rem->size = f->size - s;
   } else { rem = f->flink; }
-
-  // Correctly adjust pointers
-  if(ptr != free_list_begin()) { 
-    f->blink->flink = rem;
-    rem->blink = f->blink; }
-  else {
-    malloc_head = (void*) rem;
-    rem->blink = NULL; }
   f->size = s;
 
-  
-  Print(f, "f");
+  // Correctly adjust pointers and malloc_head
+  if(ptr != free_list_begin()) {  
+    Flist b = (Flist)before;
+    if(b != NULL) b->flink = rem;
+  }
+  else { malloc_head = (void*) rem; }
+
+  Print(f, "return");
   if(rem != NULL) Print(rem, "rem");
 }
 
 void *my_malloc(size_t s) {
-  Flist start, ret;
+  Flist head = (Flist)free_list_begin(); // Start of fflist
+  Flist before;                          // helps with adding into list
+  Flist ret;                             // memory to be returned to user
 
   // Create heap if heap is null
-  if(free_list_begin() == NULL) {
+  if(head == NULL) {
     malloc_head = sbrk(8192);
     int *h = (int*) malloc_head;
     *h = 8192;
   }
-  start = (Flist)malloc_head;
-  Print(start, "malloc_head");
-  
-  // Pad s to 8 bytes and add 8 for bookkeeping
-  s = (s + 7 + 8) & -8;
-  // Find empty chunk of memory big enough for what is requested
-  ret = find_chunk(start, s);
-  if(ret == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
-  // Print(f, "found chunk");
 
-  // Split memory chunk in two if bigger than requested
-  split(ret, s);
+  head = (Flist)malloc_head;
+  Print(head, "malloc_head");
+  s = (s + 7 + 8) & -8;             // Pad s to 8 bytes and add 8 for bookkeeping
 
-  start = (Flist)free_list_begin();
-  Print(start, "new malloc_head");
+  // Find flist node one before chunk to return to user
+  before = find_chunk(head, s);
+  if(before == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
+  // If no node before ret, set it as before
+  if(before != head || before->flink != NULL) ret = before->flink;
+  else { ret = before; before = NULL; }
+
+  // Print(before, "before");
+  // Print(ret, "ret");
+
+  split(ret, before, s);          // Split memory ret in two if bigger than requested
+
+  head = (Flist)free_list_begin();
+  Print(head, "new malloc_head");
   printf("\n");
 
   return ((void*)ret + 8);
@@ -87,20 +95,16 @@ void my_free(void *ptr) {
   // Prepend to flist if before beginning
   if(add_in < begin) {
     add_in->flink = begin;
-    add_in->blink = NULL;
-    begin->blink = add_in;
-    // Update flist start
-    malloc_head = add_in;
+    malloc_head = add_in;  // Update flist head
   } 
   else {
     // Find flist node just before where ptr is
-    while(begin->flink < add_in) { begin = begin->flink; }
-    // Adjust pointers to add in
-    Flist after = free_list_next(begin);
+    Flist f = begin;
+    while(f->flink < add_in) { f = f->flink; }
+    // Adjust pointers to insert in
+    Flist after = free_list_next(f);
     add_in->flink = after;
-    add_in->blink = begin;
-    begin->flink = add_in;
-    after->blink = add_in;
+    f->flink = add_in;
   }
 
   printf("\n");
