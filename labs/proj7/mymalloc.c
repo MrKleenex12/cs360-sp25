@@ -16,12 +16,6 @@ void Print(Flist f, char *name) {
     name, (UL)f, f->size, (UL)f->flink, (UL)f->blink);
 }
 
-void set_flist(Flist *f, const int size, Flist forw, Flist backw) {
-  (*f)->size = size;
-  (*f)->flink = forw;
-  (*f)->blink = backw;
-}
-
 /* Searches through list for chunk of memory that is big enough */
 void *find_chunk(Flist h, size_t s) {
   Flist f = h;
@@ -36,24 +30,21 @@ void *split(void *ptr, size_t s) {
   Flist f = (Flist)ptr;
   Flist rem = NULL;
   
-  //  Check if chunk can fit
+  //  Check if chunk can be split up
   if((s + 8) < f->size) {
     rem = (Flist)(ptr + s);
     rem->size = f->size - s;
+  }
+  else { rem = f->flink; }
 
-    // Correctly adjust pointers
-    if(ptr != malloc_head) {
-      f->blink->flink = rem;
-      rem->blink = f->blink;
-    }
-    else { malloc_head = (void*) rem; }
+  // Correctly adjust pointers
+  if(ptr != malloc_head) {
+    f->blink->flink = rem;
+    rem->blink = f->blink;
   }
   else {
-    if(ptr == malloc_head) { malloc_head = (void*) f->flink; }
-    else {
-      if(f->blink != NULL) f->blink->flink = f->flink;
-      f->flink->blink = f->blink;
-    }
+    malloc_head = (void*) rem;
+    rem->blink = NULL;
   }
   f->size = s;
 
@@ -95,7 +86,7 @@ void *my_malloc(size_t s) {
   return ret;
 }
 
-void my_free(void *ptr) {
+void my_free(void *ptr) {   // TODO Update my_free for every call
   /* new and old malloc_head nodes of Flist */
   Flist new, old;
 
