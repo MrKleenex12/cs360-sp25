@@ -38,7 +38,7 @@ void *split(void *ptr, size_t s) {
   else { rem = f->flink; }
 
   // Correctly adjust pointers
-  if(ptr != malloc_head) {
+  if(ptr != free_list_begin()) {
     f->blink->flink = rem;
     rem->blink = f->blink;
   }
@@ -60,7 +60,7 @@ void *my_malloc(size_t s) {
   int tmp;
 
   /* Create heap if heap is null */
-  if(malloc_head == NULL) {
+  if(free_list_begin() == NULL) {
     malloc_head = sbrk(8192);
     int *h = (int*) malloc_head;
     *h = 8192;
@@ -76,42 +76,49 @@ void *my_malloc(size_t s) {
   if(f == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
   // Print(f, "found chunk");
 
-  /* TODO Split memory chunk in two if bigger than requested */
+  /* Split memory chunk in two if bigger than requested */
   ret = split(f, s);
 
-  f = malloc_head;
+  f = (Flist)free_list_begin();
   Print(f, "new malloc_head");
   printf("\n");
 
   return ret;
 }
 
-void my_free(void *ptr) {   // TODO Update my_free for every call
-  /* new and old malloc_head nodes of Flist */
-  Flist new, old;
-
-  ptr -= 8;
+void my_free(void *ptr) {
+  Flist add_in = (Flist)(ptr -= 8);
+  Flist begin = (Flist)free_list_begin();
   printf("freeing: 0x%08lx\n", (UL)ptr);
-  old = (Flist)malloc_head;
-  malloc_head = ptr;
-  new = (Flist)malloc_head;
 
-  /* Adjust forward and backward pointers */
-  new->flink = old;
-  new->blink = NULL;
-  old->blink = new;
+  // Prepend to flist if before beginning
+  if(add_in < begin) {
+    add_in->flink = begin;
+    add_in->blink = NULL;
+    begin->blink = add_in;
+    malloc_head = add_in;
+  } 
+  else {
+    // Find flist node just before where ptr is
+    while(begin->flink < add_in) { begin = begin->flink; }
+    // Adjust pointers to add in
+    Flist after = free_list_next(begin);
+    add_in->flink = after;
+    add_in->blink = begin;
+    begin->flink = add_in;
+    after->blink = add_in;
+  }
 
-  Print(new, "new malloc_head");
-  Print(old, "old malloc_head");
   printf("\n");
 }
 
 void *free_list_begin() {
-  return NULL;
+  return malloc_head;
 }
 
 void *free_list_next(void *node) {
-  return NULL;
+  Flist f = (Flist)node;
+  return f->flink;
 }
 
 void coalesce_free_list() {
