@@ -3,7 +3,7 @@
 
 typedef unsigned long UL;
 
-void *head = NULL;    /* Singular global variable */
+void *malloc_head = NULL;    /* Singular global variable */
 
 typedef struct flist {
   int size;
@@ -33,20 +33,33 @@ void *find_chunk(Flist h, size_t s) {
 }
 
 void *split(void *ptr, size_t s) {
-  Flist f, rem;
-  f = (Flist)ptr;
+  Flist f = (Flist)ptr;
+  Flist rem = NULL;
+  
+  //  Check if chunk can fit
+  if((s + 8) < f->size) {
+    rem = (Flist)(ptr + s);
+    rem->size = f->size - s;
 
-  /* Set up Flist after split */
-  rem = (Flist)(ptr + s);
-  rem->size = f->size - s;
-  rem->flink = f->flink;
-  rem->blink = f->blink;
+    // Correctly adjust pointers
+    if(ptr != malloc_head) {
+      f->blink->flink = rem;
+      rem->blink = f->blink;
+    }
+    else { malloc_head = (void*) rem; }
+  }
+  else {
+    if(ptr == malloc_head) { malloc_head = (void*) f->flink; }
+    else {
+      if(f->blink != NULL) f->blink->flink = f->flink;
+      f->flink->blink = f->blink;
+    }
+  }
   f->size = s;
 
-  if(ptr == head) { head = (void*) rem; }
   
   Print(f, "f");
-  Print(rem, "rem");
+  if(rem != NULL) Print(rem, "rem");
   return ptr + 8;
 }
 
@@ -56,13 +69,13 @@ void *my_malloc(size_t s) {
   int tmp;
 
   /* Create heap if heap is null */
-  if(head == NULL) {
-    head = sbrk(8192);
-    int *h = (int*) head;
+  if(malloc_head == NULL) {
+    malloc_head = sbrk(8192);
+    int *h = (int*) malloc_head;
     *h = 8192;
   }
-  f = (Flist)head;
-  Print(f, "head");
+  f = (Flist)malloc_head;
+  Print(f, "malloc_head");
   
   /* Pad s to 8 bytes and add 8 for bookkeeping*/
   if((tmp = s % 8) != 0) { s += (8-tmp); }
@@ -75,30 +88,30 @@ void *my_malloc(size_t s) {
   /* TODO Split memory chunk in two if bigger than requested */
   ret = split(f, s);
 
-  f = head;
-  Print(f, "new head");
+  f = malloc_head;
+  Print(f, "new malloc_head");
   printf("\n");
 
   return ret;
 }
 
 void my_free(void *ptr) {
-  /* new and old head nodes of Flist */
+  /* new and old malloc_head nodes of Flist */
   Flist new, old;
 
   ptr -= 8;
   printf("freeing: 0x%08lx\n", (UL)ptr);
-  old = (Flist)head;
-  head = ptr;
-  new = (Flist)head;
+  old = (Flist)malloc_head;
+  malloc_head = ptr;
+  new = (Flist)malloc_head;
 
   /* Adjust forward and backward pointers */
   new->flink = old;
   new->blink = NULL;
   old->blink = new;
 
-  Print(new, "new head");
-  Print(old, "old head");
+  Print(new, "new malloc_head");
+  Print(old, "old malloc_head");
   printf("\n");
 }
 
@@ -113,4 +126,3 @@ void *free_list_next(void *node) {
 void coalesce_free_list() {
 
 }
-
