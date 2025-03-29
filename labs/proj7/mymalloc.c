@@ -11,6 +11,11 @@ typedef struct flist {
 } *Flist;
 
 void Print(void *ptr, char *name) {
+  if(ptr == NULL) {
+    printf("%s NULL\n", name);
+    return;
+  }
+
   Flist f = (Flist)ptr; 
   printf("%s: 0x%08lx s: %d f: 0x%08lx\n", 
     name, (UL)f, f->size, (UL)f->flink);
@@ -40,14 +45,24 @@ void *find_before(void *ptr) {
 void split(void *ptr, void *before, size_t s) {
   Flist f = (Flist)ptr;
   Flist rem = NULL;
+  int tmp;
   
-  //  Check whether to split up chunk or just remove it
-  if((s + 8) < f->size) {
-    rem = (Flist)(ptr + s);
-    rem->size = f->size - s;
-  } else { s += 8; rem = f->flink; }
+  tmp = f->size;
   f->size = s;
 
+  if(s + 8 < f->size) {
+    rem = (Flist)(ptr + s);
+    rem->size = tmp - s;
+  }
+  else if(f->flink != NULL) {
+    f->size += 8;
+    rem = f->flink;
+  }
+  else {
+    malloc_head = NULL;
+    return;
+  }
+ 
   // Correctly adjust pointers and malloc_head
   if(ptr != free_list_begin()) {  
     Flist b = (Flist)before;
@@ -64,23 +79,33 @@ void *my_malloc(size_t s) {
   Flist ret;                              // memory to be returned to user
 
   // Create heap if heap is null
+  s = (s + 7 + 8) & -8;                   // Pad to 8 bytes and +8 for bookkeeping
+  // printf("s: %zu\n", s);
   if(head == NULL) {
-    malloc_head = sbrk(8192);
+    // Must at least call sbrk with 8192 or bigger
+    int call = (s < 8192) ? 8192 : s;
+    malloc_head = sbrk(call); 
+    // set size of flist node
     int *h = (int*) malloc_head;
-    *h = 8192;
+    *h = call;
   }
 
   head = (Flist)malloc_head;
   Print(head, "malloc_head");
-  s = (s + 7 + 8) & -8;                   // Pad to 8 bytes and +8 for bookkeeping
 
   // Find flist node one before chunk to return to user
   ret = find_chunk(head, s);
-  if(ret == NULL) { fprintf(stderr, "no chunks found\n"); exit(1); }
+  if(ret == NULL) {
+    fprintf(stderr, "no chunks found\n");
+    exit(1);
+  }
+  Print(ret, "found chunk");
+
   // If no node before ret, set it as before
   before = find_before(ret);
-  if(before != NULL) { Print(before , "before"); }
-  Print(ret, "found chunk");
+  if(before != NULL) {
+    Print(before , "before");
+  }
 
   split(ret, before, s);                  // Adjust free list and split if needed 
 
@@ -97,6 +122,12 @@ void my_free(void *ptr) {
   Flist begin = (Flist)free_list_begin();
   printf("freeing: 0x%08lx\n", (UL)ptr);
 
+  if(begin == NULL) {
+    malloc_head = add_in;
+    add_in->flink = NULL;
+    return;
+  }
+
   // Prepend to flist if before beginning
   if(add_in < begin) {
     add_in->flink = begin;
@@ -111,7 +142,7 @@ void my_free(void *ptr) {
     add_in->flink = after;
     f->flink = add_in;
   }
-
+  Print(add_in->flink, "add_in next");
   printf("\n");
 }
 
