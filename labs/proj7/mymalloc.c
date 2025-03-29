@@ -45,23 +45,17 @@ void *find_before(void *ptr) {
 void split(void *ptr, void *before, size_t s) {
   Flist f = (Flist)ptr;
   Flist rem = NULL;
-  int tmp;
+  int old_fsize;
   
-  tmp = f->size;
+  old_fsize = f->size;
   f->size = s;
 
-  if(s + 8 < f->size) {
+  if(s + 8 < old_fsize) {
     rem = (Flist)(ptr + s);
-    rem->size = tmp - s;
-  }
-  else if(f->flink != NULL) {
+    rem->size = old_fsize - s;
+  } else {
     f->size += 8;
-    rem = f->flink;
-  }
-  else {
-    malloc_head = NULL;
-    return;
-  }
+    rem = f->flink; }
  
   // Correctly adjust pointers and malloc_head
   if(ptr != free_list_begin()) {  
@@ -73,44 +67,41 @@ void split(void *ptr, void *before, size_t s) {
   if(rem != NULL) Print(rem, "rem");
 }
 
+void *call_sbrk(size_t s) {
+  int size = (s < 8192) ? 8192 : s;       // Must at least size sbrk with 8192 or bigger
+  malloc_head = sbrk(size); 
+  int *h = (int*) malloc_head;            // set size of flist node
+  *h = size;
+  return malloc_head;
+}
+
 void *my_malloc(size_t s) {
   Flist head = (Flist)free_list_begin();  // Start of fflist
   Flist before;                           // helps with adding into list
   Flist ret;                              // memory to be returned to user
 
-  // Create heap if heap is null
   s = (s + 7 + 8) & -8;                   // Pad to 8 bytes and +8 for bookkeeping
-  // printf("s: %zu\n", s);
-  if(head == NULL) {
-    // Must at least call sbrk with 8192 or bigger
-    int call = (s < 8192) ? 8192 : s;
-    malloc_head = sbrk(call); 
-    // set size of flist node
-    int *h = (int*) malloc_head;
-    *h = call;
-  }
-
-  head = (Flist)malloc_head;
+  if(!head) head = (Flist)call_sbrk(s);   // Create heap if heap is null
   Print(head, "malloc_head");
 
   // Find flist node one before chunk to return to user
-  ret = find_chunk(head, s);
-  if(ret == NULL) {
+  
+  if((ret = find_chunk(head, s)) == NULL) {
     fprintf(stderr, "no chunks found\n");
     exit(1);
   }
   Print(ret, "found chunk");
 
   // If no node before ret, set it as before
-  before = find_before(ret);
-  if(before != NULL) {
+  if((before = find_before(ret)) != NULL) {
     Print(before , "before");
   }
 
-  split(ret, before, s);                  // Adjust free list and split if needed 
+  // Split memory chunk if enough space in free list
+  if(s+8 >= ret->size && ret->flink == NULL) { malloc_head = NULL; }
+  else { split(ret, before, s); }
 
-  head = (Flist)free_list_begin();
-  Print(head, "new malloc_head");
+  Print((Flist)free_list_begin(), "new malloc_head");
   printf("\n");
 
   return ((void*)ret + 8);
