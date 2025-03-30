@@ -12,7 +12,7 @@ typedef struct free_list_node {
 } *FLN;
 
 void Print(void *ptr, char *name) {
-  if(ptr == NULL) {
+  if(!ptr) {
     printf("%s NULL\n", name);
     return;
   }
@@ -72,14 +72,14 @@ void *my_malloc(size_t size) {
 
   size = (size+7+8) & -8;                       // Pad to 8 bytes and +8 for bookkeeping
   printf("size: %zu\n", size);
-  if(head == NULL) {                            // Create heap if heap is null
+  if(!head) {                            // Create heap if heap is null
     head = (FLN)call_sbrk(size);
     malloc_head = head;
   }
   Print(head, "head");
 
   // If valid chunk not found, sbrk more to the end of FLN
-  if((chunk = find_chunk(head, size)) == NULL) {
+  if(!(chunk = find_chunk(head, size))) {
     chunk = (FLN)call_sbrk(size);
     FLN f = head;
     while(f->next != NULL) f = f->next;
@@ -90,7 +90,7 @@ void *my_malloc(size_t size) {
   /* TODO Splitting */
 
   // Split memory chunk if enough space in free list
-  if(size+8 >= chunk->size && chunk->next == NULL) {
+  if(size+8 >= chunk->size && !(chunk->next)) {
     malloc_head = NULL;
     ret = chunk;
   }
@@ -109,11 +109,11 @@ void my_free(void *ptr) {
   FLN f = (FLN)ptr;
   printf("freeing: 0x%08lx\n", (UL)ptr);
 
-  if(head == NULL) {
+  if(!head) {
     malloc_head = f;
     set_ptrs(f, NULL, NULL);
   }
-  else if(f < head) {
+  else if(f > head) {
     malloc_head = f;
     set_ptrs(f, head, NULL);
   }
@@ -133,7 +133,49 @@ void *free_list_next(void *node) {
   return f->next;
 }
 
-void coalesce_free_list() {
-  // TODO - Write insertion sort to order linked list by memory location
+FLN insert(FLN new, FLN sorted) {
+  if(new < sorted || sorted == NULL) {
+    new->next = sorted; 
+    sorted = new;
+  }
+  else {
+    FLN curr = sorted;
+    while(new > curr->next && curr->next != NULL) {
+      curr = curr->next;
+    }
+    new->next = curr->next;
+    curr->next = new;
+  }
+  return sorted;
+}
 
+// Insertion sort
+FLN sort(void *head) {
+  FLN sorted = NULL;
+  FLN curr = (FLN)head;
+
+  while(curr != NULL) {
+    sorted = insert(curr, sorted);
+    curr = curr->next;
+  }
+  return sorted;
+}
+void coalesce_free_list() {
+  FLN f = (FLN)free_list_begin();
+  f = sort(f);
+  
+  while(f != NULL) {
+    void *v1 = (void*)f;
+    void *v2 = (void*)f->next;
+    // If current chunk addres + size = next chunk address
+    if(v1 + f->size == v2) {
+      if(f->next) {
+        f->size += f->next->size;
+        if(f->next->next) f->next->next->back = f;
+        f->next = f->next->next;
+      } else { f->next = NULL; }
+    }
+
+    f = f->next;
+  }
 }
