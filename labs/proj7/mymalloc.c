@@ -58,6 +58,7 @@ void *split(void *chunk, size_t size) {
     set_ptrs(ret, NULL, NULL);
   }
   else { 
+    if(chunk == free_list_begin()) malloc_head = NULL;
     ret = f;
     if(f->back) f->back->next = f->next;
     if(f->next) f->next->back = f->back;
@@ -72,11 +73,10 @@ void *my_malloc(size_t size) {
   void *ret;
 
   size = (size+7+8) & -8;                       // Pad to 8 bytes and +8 for bookkeeping
-  if(!head) {                            // Create heap if heap is null
+  if(!head) {                                   // Create heap if heap is null
     head = (FLN)call_sbrk(size);
     malloc_head = head;
   }
-  // Print(head, "head");
 
   // If valid chunk not found, sbrk more to the end of FLN
   if(!(chunk = find_chunk(head, size))) {
@@ -84,20 +84,12 @@ void *my_malloc(size_t size) {
     FLN f = head;
     while(f->next != NULL) f = f->next;
     f->next = chunk;
+    chunk->back = f;
   }
-  // Print(chunk, "found chunk");
 
   // Split memory chunk if enough space in free list
-  if(size+8 >= chunk->size && !(chunk->next)) {
-    malloc_head = NULL;
-    ret = chunk;
-  }
-  else { ret = split(chunk, size); }
-  /*
-  Print(ret, "ret");
-  Print((FLN)free_list_begin(), "new malloc_head");
-  printf("\n");
-  */
+  ret = split(chunk, size);
+
   return ret + 8;
 }
 
@@ -105,7 +97,7 @@ void my_free(void *ptr) {
   ptr -= 8;
   FLN head = (FLN)free_list_begin(); 
   FLN f = (FLN)ptr;
-  // printf("freeing: 0x%08lx\n", (UL)ptr);
+  // printf("freeing: 0x%08lx\n\n", (UL)ptr);
 
   if(!head) {
     malloc_head = f;
@@ -156,15 +148,6 @@ FLN sort(void *head) {
   FLN curr = (FLN)head;
   FLN next = NULL;
 
-  /*
-  printf("Before sorted\n");
-  FLN f = curr;
-  while(f) {
-    Print(f, "f");
-    f = f->next;
-  } 
-  */
-
   while(curr != NULL) {
     next = curr->next;
     sorted = insert(curr, sorted);
@@ -174,20 +157,11 @@ FLN sort(void *head) {
   malloc_head = sorted;
   sorted->back = NULL;
 
-  /*
-  printf("After sorted\n");
-  f = sorted;
-  while(f) {
-    Print(f, "f");
-    f = f->next;
-  } 
-  */
   return sorted;
 }
 
 void coalesce_free_list() {
-  FLN f = (FLN)free_list_begin();
-  f = sort(f);
+  FLN f = sort(free_list_begin());
 
   while(f != NULL) {
     // If current chunk addres + size = next chunk address
@@ -201,5 +175,4 @@ void coalesce_free_list() {
 
     f = f->next;
   }
-  // Print(free_list_begin(), "head");
 }
