@@ -64,7 +64,7 @@ void split(void *ptr, void *before, size_t s) {
     if(b != NULL) b->flink = rem;
   }
 
-  if(rem != NULL) Print(rem, "rem");
+  // if(rem != NULL) Print(rem, "rem");
 }
 
 void *call_sbrk(size_t s) {
@@ -82,24 +82,26 @@ void *my_malloc(size_t s) {
 
   s = (s+7+8) & -8;                       // Pad to 8 bytes and +8 for bookkeeping
   if(!head) head = (Flist)call_sbrk(s);   // Create heap if heap is null
-  Print(head, "malloc_head");
+  // Print(head, "malloc_head");
 
   // Find flist node one before chunk to return to user
   if((ret = find_chunk(head, s)) == NULL) {
     fprintf(stderr, "no chunks found\n");
     exit(1);
   }
-  Print(ret, "found chunk");
+  // Print(ret, "found chunk");
 
   // If no node before ret, set it as before
-  if((before = find_before(ret)) != NULL) { Print(before , "before"); }
+  if((before = find_before(ret)) != NULL) {
+    // Print(before , "before");
+  }
 
   // Split memory chunk if enough space in free list
   if(s+8 >= ret->size && ret->flink == NULL) { malloc_head = NULL; }
   else { split(ret, before, s); }
 
-  Print((Flist)free_list_begin(), "new malloc_head");
-  printf("\n");
+  // Print((Flist)free_list_begin(), "new malloc_head");
+  // printf("\n");
 
   // Return requested memory to user
   return ((void*)ret + 8);
@@ -107,7 +109,9 @@ void *my_malloc(size_t s) {
 
 void insert_node(Flist before, Flist insert) {
   // Find flist node just before where ptr is
-  while(before->flink < insert) { before = before->flink; }
+  while(before->flink != NULL && before->flink < insert) {
+    before = before->flink;
+  }
   // Adjust pointers to insert insert
   Flist after = free_list_next(before);
   insert->flink = after;
@@ -117,7 +121,7 @@ void my_free(void *ptr) {
   ptr -= 8;
   Flist insert = (Flist)(ptr);
   Flist start = (Flist)free_list_begin();
-  printf("freeing: 0x%08lx\n", (UL)ptr);
+  // printf("freeing: 0x%08lx\n", (UL)ptr);
 
   // If flist is empty, set head
   if(start == NULL) {
@@ -133,8 +137,8 @@ void my_free(void *ptr) {
   } 
   else { insert_node(start, insert); }
 
-  Print(insert->flink, "insert next");
-  printf("\n");
+  // Print(insert->flink, "insert next");
+  // printf("\n");
 }
 
 void *free_list_begin() {
@@ -162,9 +166,5 @@ void coalesce_free_list() {
 
     f = f->flink;
   }
-  
-  
-  Print((Flist)malloc_head, "after coal");
-        
-     
+  // Print((Flist)malloc_head, "after coal");
 }
