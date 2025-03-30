@@ -1,14 +1,15 @@
-#include "mymalloc.h"
 #include <unistd.h>
+#include "mymalloc.h"
 
 typedef unsigned long UL;
 
-void *malloc_head = NULL;                 // Global var
+void *malloc_head = NULL;
 
-typedef struct flist {
+typedef struct free_list_node {
   int size;
-  struct flist *flink;
-} *Flist;
+  struct free_list_node *next;
+  struct free_list_node *back;
+} *FLN;
 
 void Print(void *ptr, char *name) {
   if(ptr == NULL) {
@@ -16,132 +17,111 @@ void Print(void *ptr, char *name) {
     return;
   }
 
-  Flist f = (Flist)ptr; 
-  printf("%s: 0x%08lx s: %d f: 0x%08lx\n", 
-    name, (UL)f, f->size, (UL)f->flink);
+  FLN f = (FLN)ptr; 
+  printf("%s: 0x%08lx s: %d f: 0x%08lx b: 0x%08lx\n", 
+    name, (UL)f, f->size, (UL)f->next, (UL)f->back);
+}
+
+void set_ptrs(FLN ptr, FLN forward, FLN backward) {
+  ptr->next = forward;
+  ptr->back = backward;
 }
 
 // Searches through list for ret of memory that is big enough
 void *find_chunk(void *ptr, size_t s) {
-  Flist f = (Flist)ptr;
+  FLN f = (FLN)ptr;
   while(f != NULL) {
     if(s <= f->size) { return f; }
-    f = f->flink;
+    f = f->next;
   }
-  return NULL;                            // If no chunks found 
-}
-
-void *find_before(void *ptr) {
-  // There is no flist node before malloc_head
-  Flist f;
-  if((f = (Flist)free_list_begin()) == ptr) return NULL;
-  
-  while(f->flink != NULL && (void*)f < ptr) {
-    if((void*) f->flink == ptr) return f;
-  }
-  return NULL;
-}
-
-void split(void *ptr, void *before, size_t s) {
-  Flist f = (Flist)ptr;
-  Flist rem = NULL;
-  
-  // Set size and store onto old size of memory chunk
-  int old_fsize = f->size;
-  f->size = s;
-
-  if(s+8 < old_fsize) {
-    rem = (Flist)(ptr + s);
-    rem->size = old_fsize - s;
-  } else {
-    f->size += 8;
-    rem = f->flink; }
- 
-  // Correctly adjust pointers and malloc_head
-  if(ptr == free_list_begin()) malloc_head = (void*) rem;
-  else {  
-    Flist b = (Flist)before;
-    if(b != NULL) b->flink = rem;
-  }
-
-  // if(rem != NULL) Print(rem, "rem");
+  return NULL;                                  // If no chunks found 
 }
 
 void *call_sbrk(size_t s) {
-  int size = (s < 8192) ? 8192 : s;       // Must sbrk with 8192 or bigger
-  void *ret = sbrk(size); 
-  int *h = (int*) ret;                    // set size of flist node
+  int size = (s < 8192) ? 8192 : s;             // Must sbrk with 8192 or bigger
+  void *start = sbrk(size); 
+  int *h = (int*) start;                        // set size of FLN node
   *h = size;
-  return ret;
+  return start;
 }
 
-void *my_malloc(size_t s) {
-  Flist head = (Flist)free_list_begin();  // Start of fflist
-  Flist before = NULL;                    // helps with adding into list
-  Flist ret = NULL;                       // memory to be returned to user
+void *split(void *chunk, size_t size) {
+  FLN f = (FLN)chunk;
+  FLN ret = NULL;
 
-  s = (s+7+8) & -8;                       // Pad to 8 bytes and +8 for bookkeeping
-  if(!head) head = (Flist)call_sbrk(s);   // Create heap if heap is null
-  malloc_head = head;
-  // Print(head, "malloc_head");
-
-  // If valid chunk not found, sbrk more to the end of flist
-  if((ret = find_chunk(head, s)) == NULL) {
-    ret = (Flist)call_sbrk(s);
-    Flist f = head;
-    while(f->flink != NULL) f = f->flink;
-    f->flink = ret;
+  // Set size and store onto old size of memory chunk
+  if(size+8 < f->size) {
+    int old = f->size;
+    f->size -= size;
+    ret = (FLN)(chunk + f->size);
+    ret->size = size;
   }
-  // Print(ret, "found chunk");
-
-  // If no node before ret, set it as before
-  if((before = find_before(ret)) != NULL) {
-    // Print(before , "before");
+  else { 
+    ret = f;
+    if(f->back) f->back->next = f->next;
+    if(f->next) f->next->back = f->back;
   }
+
+  return (void*)ret;
+}
+
+void *my_malloc(size_t size) {
+  FLN head = (FLN)free_list_begin();            // Start of FLN
+  FLN chunk = NULL;                             // Chunk found to return to user
+  void *ret;
+
+  size = (size+7+8) & -8;                       // Pad to 8 bytes and +8 for bookkeeping
+  printf("size: %zu\n", size);
+  if(head == NULL) {                            // Create heap if heap is null
+    head = (FLN)call_sbrk(size);
+    malloc_head = head;
+  }
+  Print(head, "head");
+
+  // If valid chunk not found, sbrk more to the end of FLN
+  if((chunk = find_chunk(head, size)) == NULL) {
+    chunk = (FLN)call_sbrk(size);
+    FLN f = head;
+    while(f->next != NULL) f = f->next;
+    f->next = chunk;
+  }
+  Print(chunk, "found chunk");
+
+  /* TODO Splitting */
 
   // Split memory chunk if enough space in free list
-  if(s+8 >= ret->size && ret->flink == NULL) { malloc_head = NULL; }
-  else { split(ret, before, s); }
-
-  // Print((Flist)free_list_begin(), "new malloc_head");
-  // printf("\n");
-
-  // Return requested memory to user
-  return ((void*)ret + 8);
-}
-
-void insert_node(Flist before, Flist insert) {
-  // Find flist node just before where ptr is
-  while(before->flink != NULL && before->flink < insert) {
-    before = before->flink;
+  if(size+8 >= chunk->size && chunk->next == NULL) {
+    malloc_head = NULL;
+    ret = chunk;
   }
-  // Adjust pointers to insert insert
-  Flist after = free_list_next(before);
-  insert->flink = after;
-  before->flink = insert;
+  else { ret = split(chunk, size); }
+
+  Print(ret, "rem");
+  Print((FLN)free_list_begin(), "new malloc_head");
+  printf("\n");
+
+  return ret + 8;
 }
+
 void my_free(void *ptr) {
   ptr -= 8;
-  Flist insert = (Flist)(ptr);
-  Flist start = (Flist)free_list_begin();
-  // printf("freeing: 0x%08lx\n", (UL)ptr);
+  FLN head = (FLN)free_list_begin(); 
+  FLN f = (FLN)ptr;
+  printf("freeing: 0x%08lx\n", (UL)ptr);
 
-  // If flist is empty, set head
-  if(start == NULL) {
-    malloc_head = insert;
-    insert->flink = NULL;
-    return;
+  if(head == NULL) {
+    malloc_head = f;
+    set_ptrs(f, NULL, NULL);
   }
-
-  // Prepend to flist if before beginning
-  if(insert < start) {
-    insert->flink = start;
-    malloc_head = insert;  // Update flist head
-  } 
-  else { insert_node(start, insert); }
-
-  // Print(insert->flink, "insert next");
-  // printf("\n");
+  else if(f < head) {
+    malloc_head = f;
+    set_ptrs(f, head, NULL);
+  }
+  else {
+    if(head->next) head->next->back = f;
+    set_ptrs(f, head->next, head);
+    head->next = f;
+  }
 }
 
 void *free_list_begin() {
@@ -149,25 +129,11 @@ void *free_list_begin() {
 }
 
 void *free_list_next(void *node) {
-  Flist f = (Flist)node;
-  return f->flink;
+  FLN f = (FLN)node;
+  return f->next;
 }
 
 void coalesce_free_list() {
-  Flist f = (Flist)free_list_begin();
-  while(f != NULL) {
-    void *v1 = (void*)f;
-    void *v2 = (void*)f->flink;
-    
-    // If current chunk addres + size = next chunk address
-    if(v1 + f->size == v2) {
-      if(f->flink != NULL) {
-        f->size += f->flink->size;
-        f->flink = f->flink->flink;
-      } else { f->flink = NULL; }
-    }
+  // TODO - Write insertion sort to order linked list by memory location
 
-    f = f->flink;
-  }
-  // Print((Flist)malloc_head, "after coal");
 }

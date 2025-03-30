@@ -1,5 +1,5 @@
 *.html
 test.c
 test
-*.o
+a.out
 old
