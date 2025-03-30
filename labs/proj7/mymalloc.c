@@ -69,10 +69,10 @@ void split(void *ptr, void *before, size_t s) {
 
 void *call_sbrk(size_t s) {
   int size = (s < 8192) ? 8192 : s;       // Must sbrk with 8192 or bigger
-  malloc_head = sbrk(size); 
-  int *h = (int*) malloc_head;            // set size of flist node
+  void *ret = sbrk(size); 
+  int *h = (int*) ret;                    // set size of flist node
   *h = size;
-  return free_list_begin();
+  return ret;
 }
 
 void *my_malloc(size_t s) {
@@ -82,12 +82,15 @@ void *my_malloc(size_t s) {
 
   s = (s+7+8) & -8;                       // Pad to 8 bytes and +8 for bookkeeping
   if(!head) head = (Flist)call_sbrk(s);   // Create heap if heap is null
+  malloc_head = head;
   // Print(head, "malloc_head");
 
-  // Find flist node one before chunk to return to user
+  // If valid chunk not found, sbrk more to the end of flist
   if((ret = find_chunk(head, s)) == NULL) {
-    fprintf(stderr, "no chunks found\n");
-    exit(1);
+    ret = (Flist)call_sbrk(s);
+    Flist f = head;
+    while(f->flink != NULL) f = f->flink;
+    f->flink = ret;
   }
   // Print(ret, "found chunk");
 
