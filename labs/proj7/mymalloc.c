@@ -1,3 +1,8 @@
+/*  Larry Wang - mymalloc.c - 3/30/2025
+    mymalloc.c writes the bodies of mymalloc, myfree, etc. It keeps track of memory on the heap
+    and gives to and takes back from the user that calls these functions
+*/
+
 #include <unistd.h>
 #include "mymalloc.h"
 
@@ -11,12 +16,9 @@ typedef struct free_list_node {
   struct free_list_node *back;
 } *FLN;
 
+// Helper function
 void Print(void *ptr, char *name) {
-  if(!ptr) {
-    printf("%s NULL\n", name);
-    return;
-  }
-
+  if(!ptr) { printf("%s NULL\n", name); return; }
   FLN f = (FLN)ptr; 
   printf("%s: 0x%08lx s: %d f: 0x%08lx b: 0x%08lx\n", 
     name, (UL)f, f->size, (UL)f->next, (UL)f->back);
@@ -57,6 +59,7 @@ void *split(void *chunk, size_t size) {
     ret->size = size;
     set_ptrs(ret, NULL, NULL);
   }
+  // Completely remove node from list and adjust pointers
   else { 
     if(chunk == free_list_begin()) malloc_head = NULL;
     ret = f;
@@ -87,26 +90,21 @@ void *my_malloc(size_t size) {
     chunk->back = f;
   }
 
-  // Split memory chunk if enough space in free list
-  ret = split(chunk, size);
+  ret = split(chunk, size);                    // split or adjust pointers for flist
 
   return ret + 8;
 }
 
 void my_free(void *ptr) {
-  ptr -= 8;
   FLN head = (FLN)free_list_begin(); 
-  FLN f = (FLN)ptr;
-  // printf("freeing: 0x%08lx\n\n", (UL)ptr);
-
-  if(!head) {
-    malloc_head = f;
-    set_ptrs(f, NULL, NULL);
-  }
-  else if(f > head) {
+  FLN f = (FLN)(ptr-8);
+  
+  // Insert at front if NULL or larger than head
+  if(!head || f > head) {
     malloc_head = f;
     set_ptrs(f, head, NULL);
   }
+  // Insert right after head to make it easier for insertion sort
   else {
     if(head->next) head->next->back = f;
     set_ptrs(f, head->next, head);
@@ -124,19 +122,21 @@ void *free_list_next(void *node) {
 }
 
 FLN insert(FLN new, FLN sorted) {
+  // Insert into front if possible
   if(new < sorted || sorted == NULL) {
     new->next = sorted; 
     if(sorted) sorted->back = new;
     sorted = new;
   }
+  // Index through sorted list to find position
   else {
     FLN curr = sorted;
     while(new > curr->next && curr->next != NULL) {
       curr = curr->next;
     }
+    // Insert into position
     if(curr->next) curr->next->back = new;
-    new->next = curr->next;
-    new->back = curr;
+    set_ptrs(new, curr->next, curr);
     curr->next = new;
   }
   return sorted;
@@ -148,6 +148,7 @@ FLN sort(void *head) {
   FLN curr = (FLN)head;
   FLN next = NULL;
 
+  // Index through list and insert into sorted list
   while(curr != NULL) {
     next = curr->next;
     sorted = insert(curr, sorted);
@@ -163,14 +164,13 @@ FLN sort(void *head) {
 void coalesce_free_list() {
   FLN f = sort(free_list_begin());
 
+  // Loop through entire list
   while(f != NULL) {
-    // If current chunk addres + size = next chunk address
+    // Loop if current chunk addres + size = next chunk address
     while((void*)f + f->size == f->next) {
-      if(f->next) {
-        f->size += f->next->size;
-        if(f->next->next) f->next->next->back = f;
-        f->next = f->next->next;
-      } else { f->next = NULL; }
+      f->size += f->next->size;
+      if(f->next->next) f->next->next->back = f;
+      f->next = f->next->next;
     }
 
     f = f->next;
