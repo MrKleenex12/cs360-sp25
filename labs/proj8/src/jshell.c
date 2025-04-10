@@ -29,25 +29,20 @@ void free_command(Command *com) {
 
 
 Command* make_command() {
-  Command *cm = (Command*)malloc(sizeof(Command));
-  cm->append_stdout = 0;
-  cm->wait = 1;
-  cm->n_commands = 0;
-  cm->stdinp = NULL;
-  cm->stdoutp = NULL;
-  cm->argcs = (int*)malloc(BUFSIZ);
-  cm->comlist = new_dllist();
-  return cm;
+  Command *c = (Command*)malloc(sizeof(Command));
+  c->append_stdout = 0;
+  c->wait = 1;
+  c->n_commands = 0;
+  c->stdinp = NULL;
+  c->stdoutp = NULL;
+  c->argcs = (int*)malloc(BUFSIZ);
+  c->comlist = new_dllist();
+  return c;
 }
 
-void move_argvs(char ***argvs,int processes, Dllist d) {
+void move_argvs(Command *c, Dllist d) {
   Dllist tmp;
   int index = 0;
-  
-  // TODO allocate space for argvs
-  dll_traverse(tmp, d) {
-    argvs[index++] = (char**)tmp->val.v;
-  }
 }
 
 
@@ -71,17 +66,29 @@ int main(int argc, char *argv[]) {
     if(strcmp(is->fields[0], "END") == 0) { break; }
     else {
       com->argcs[com->n_commands] = is->NF;
-      dll_append(com->comlist, new_jval_v((void*)is->fields));
+
+      // TODO - Make buffer?
+
+      // allocate copy_argvs and strdup fields
+      char **copy_argvs = (char**)malloc(sizeof(char*) * is->NF + 1);  // +1 for the NULL at the end
+      for(int i = 0; i < is->NF; i++) { copy_argvs[i] = strdup(is->fields[i]); }
+      copy_argvs[is->NF] = NULL;
+
+      dll_append(com->comlist, new_jval_v(copy_argvs));
       com->n_commands++;
     }
   }
 
 
   printf("number of commands = %d\n", com->n_commands);
-  /*
-  dll_traverse(tmp, com->comlist)
-    printf("%s ", tmp->)
-  */
+  for(int i = 0; i < com->n_commands; i++) printf("%d ", com->argcs[i]);
+  printf("\n");
+
+  printf("first field of every argv:\n");
+  dll_traverse(tmp, com->comlist) {
+    printf("%s\n", ((char**)tmp->val.v)[0]);
+  }
+
   // while(get_line(is) > 0) {
   //   /* Ignore if blank line or line begins with a '#' */
   //   if(is->text1[0] == '#') continue;
