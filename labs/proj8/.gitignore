@@ -2,3 +2,4 @@ bin/*
 !bin/.keep
 *.html
 makefile
+grade*
