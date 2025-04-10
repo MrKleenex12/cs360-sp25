@@ -2,6 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include "fields.h"
+#include "dllist.h"
+
+/* Copied from Jantz lab 8 writeup */
+typedef struct {
+  char *stdin;          /* Filename from which to redirect stdin.  NULL if empty.*/ 
+  char *stdout;         /* Filename to which to redirect stdout.  NULL if empty.*/ 
+  int append_stdout;    /* Boolean for appending.*/ 
+  int wait;             /* Boolean for whether I should wait.*/ 
+  int n_commands;       /* The number of commands that I have to execute*/ 
+  int *argcs;           /* argcs[i] is argc for the i-th command*/ 
+  char ***argvs;        /* argcv[i] is the argv array for the i-th command*/ 
+  Dllist comlist;       /* I use this to incrementally read the commands.*/ 
+} Command;
 
 int main(int argc, char *argv[]) {
   IS is = new_inputstruct(NULL);  // input proccessing
@@ -9,16 +22,14 @@ int main(int argc, char *argv[]) {
   /*  Use char array for first commmand line argument
       set index to 1 if letter was found */
   char letters[] = {0, 0, 0};
-  if(argc == 2) {
-    for(size_t i = 0; i < strlen(argv[1]); i++) {
-      if(argv[1][i] == 'r') letters[0] = 1;
-      else if(argv[1][i] == 'p') letters[1] = 1;
-      else if(argv[1][i] == 'n') letters[2] = 1;
-    }
+  if (argc == 2) {
+    letters[0] = strchr(argv[1], 'r') != NULL;
+    letters[1] = strchr(argv[1], 'p') != NULL;
+    letters[2] = strchr(argv[1], 'n') != NULL;
   }
 
   /* TODO program one command execution */  
-  
+
   // while(get_line(is) > 0) {
   //   /* Ignore if blank line or line begins with a '#' */
   //   if(is->text1[0] == '#') continue;
