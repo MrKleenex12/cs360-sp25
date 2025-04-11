@@ -18,31 +18,49 @@ typedef struct{
   Dllist comlist;       /* I use this to incrementally read the commands.*/ 
 } Command;
 
+void free_argvs(Command *c) {
+  for(int i = 0; i < c->n_commands; i++) {
+    for(int j = 0; j < c->argcs[i]; j++)      /* Iterate through each argv */
+      free(c->argvs[i][j]);
+    free(c->argvs[i]);                        /* Free argv */
+  } 
+  free(c->argvs);                             /* Free argvs */
 
-void free_command(Command *com) {
-  if(com->stdinp != NULL) free(com->stdinp);
-  if(com->stdoutp != NULL) free(com->stdoutp);
-  if(com->argcs != NULL) free(com->argcs);
-  if(com->argvs != NULL) free(com->argvs);
-  free_dllist(com->comlist);
+}
+
+void free_command(Command *c) {
+  if(c->stdinp != NULL) free(c->stdinp);
+  if(c->stdoutp != NULL) free(c->stdoutp);
+  if(c->argvs != NULL) free_argvs(c);
+  if(c->argcs != NULL) free(c->argcs);
+  free_dllist(c->comlist);
+  free(c);
 }
 
 
 Command* make_command() {
+  /* Allocate command struct and */
   Command *c = (Command*)malloc(sizeof(Command));
   c->append_stdout = 0;
   c->wait = 1;
   c->n_commands = 0;
   c->stdinp = NULL;
   c->stdoutp = NULL;
+  c->argvs = NULL;
   c->argcs = (int*)malloc(BUFSIZ);
   c->comlist = new_dllist();
   return c;
 }
 
-void move_argvs(Command *c, Dllist d) {
+void move_argvs(Command *c) {
   Dllist tmp;
   int index = 0;
+
+  /* Allocate space for argvs and copy over from comlist */
+  c->argvs = (char***)malloc(sizeof(char*) * c->n_commands);
+  dll_traverse(tmp, c->comlist) {
+    c->argvs[index++] = (char**)tmp->val.v;
+  }
 }
 
 
@@ -60,8 +78,8 @@ void add_command(Command *c, IS is) {
 
 
 int main(int argc, char *argv[]) {
-  IS is = new_inputstruct(NULL);                  // input proccessing
-  Command *com = make_command();                  // structure for storing commands
+  IS is = new_inputstruct(NULL);                  /* input proccessing */ 
+  Command *com = make_command();                  /* structure for storing commands */
   Dllist tmp;
 
   /*  Use char array for first commmand line argument
@@ -84,15 +102,8 @@ int main(int argc, char *argv[]) {
   }
 
 
-  printf("number of commands = %d\n", com->n_commands);
-  for(int i = 0; i < com->n_commands; i++) printf("%d ", com->argcs[i]);
-  printf("\n");
-
-
-  printf("first field of every argv:\n");
-  dll_traverse(tmp, com->comlist) {
-    printf("%s\n", ((char**)tmp->val.v)[0]);
-  }
+  move_argvs(com);
+  
 
   jettison_inputstruct(is);
   free_command(com);
