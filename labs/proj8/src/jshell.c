@@ -39,7 +39,7 @@ void free_command(Command *c) {
 
 
 Command* make_command() {
-  /* Allocate command struct and */
+  /* Allocate command struct and default values */
   Command *c = (Command*)malloc(sizeof(Command));
   c->append_stdout = 0;
   c->wait = 1;
@@ -77,6 +77,29 @@ void add_command(Command *c, IS is) {
 }
 
 
+void print_command(Command *c) {
+  printf("stdin:    %s\n", c->stdinp);
+  printf("stdout:   %s (Append=%d)\n", c->stdinp, c->append_stdout);
+  printf("N_Commands:  %d\n", c->n_commands);
+  printf("Wait:        %d\n", c->wait);
+
+  Dllist tmp;
+  int index = 0;
+  dll_traverse(tmp, c->comlist) {
+    printf("  %d: argc:%d    argv: ", index, c->argcs[index]);
+    for(int i = 0; i < c->argcs[index]; i++) printf("%s ", ((char**)tmp->val.v)[i]);
+    printf("\n");
+    index++;
+  }
+  /*
+  for(int i = 0; i < c->n_commands; i++) {
+    printf("  %d: argc:%d    argv: ", i, c->argcs[i]);
+    for(int j = 0; j < c->argcs[i]; j++) printf("%s ", c->argvs[i][j]);
+    printf("\n");
+  }
+  */
+}
+
 int main(int argc, char *argv[]) {
   IS is = new_inputstruct(NULL);                  /* input proccessing */ 
   Command *com = make_command();                  /* structure for storing commands */
@@ -93,14 +116,29 @@ int main(int argc, char *argv[]) {
 
 
   /* TODO program one command execution */  
-  while(get_line(is) > 0) {
-    /*  Break input and process commands */
-    if(strcmp(is->fields[0], "END") == 0) break;
-    /*  If nothing else, it is a command that must be 
-        added into the list */
-    else {  add_command(com, is); }
+  /* Reading stdin for jshell commands */
+  while(get_line(is) > -1) {
+    /*  IGNORE: Ingore stdin */
+    if(is->fields[0][0] == '#' || is->NF == 0) continue;
+    /*  STDIN: Redirect stdin from file to first child process */
+    else if(is->fields[0][0] == '<') { com->stdinp = strdup(is->fields[1]); } 
+    /*  STDOUT: Redirect stdout of last child process */
+    else if(is->fields[0][0] == '>') {
+      com->stdoutp = strdup(is->fields[1]);
+      if(strcmp(is->fields[0], ">>") == 0) com->append_stdout = 1;    // Append
+    } 
+    /*  WAIT */
+    else if(strcmp(is->fields[0], "NOWAIT") == 0) com->wait = 0;
+    /*  END: Break input and process commands */
+    else if(strcmp(is->fields[0], "END") == 0) {
+      if(letters[1]== 1) print_command(com); 
+      break;
+    } 
+    /*  COMMAND: Anything else is a command; add it to the list */
+    else { 
+      // printf("%d - %s", is->NF, is->text1);
+      add_command(com, is); }
   }
-
 
   move_argvs(com);
   
