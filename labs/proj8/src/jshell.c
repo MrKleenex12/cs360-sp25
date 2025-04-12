@@ -25,7 +25,6 @@ void free_argvs(Command *c) {
     free(c->argvs[i]);                        /* Free argv */
   } 
   free(c->argvs);                             /* Free argvs */
-
 }
 
 void free_command(Command *c) {
@@ -85,19 +84,18 @@ void print_command(Command *c) {
 
   Dllist tmp;
   int index = 0;
+  int argc_tmp;
+  char **argv_tmp;
+
   dll_traverse(tmp, c->comlist) {
-    printf("  %d: argc:%d    argv: ", index, c->argcs[index]);
-    for(int i = 0; i < c->argcs[index]; i++) printf("%s ", ((char**)tmp->val.v)[i]);
+    argv_tmp = (char**)(tmp->val.v);
+    argc_tmp = c->argcs[index];
+
+    printf("  %d: argc: %d    argv: ", index, argc_tmp);
+    for(int i = 0; i < argc_tmp; i++) printf("%s ", argv_tmp[i]);
     printf("\n");
     index++;
   }
-  /*
-  for(int i = 0; i < c->n_commands; i++) {
-    printf("  %d: argc:%d    argv: ", i, c->argcs[i]);
-    for(int j = 0; j < c->argcs[i]; j++) printf("%s ", c->argvs[i][j]);
-    printf("\n");
-  }
-  */
 }
 
 int main(int argc, char *argv[]) {
@@ -116,6 +114,7 @@ int main(int argc, char *argv[]) {
 
 
   /* TODO program one command execution */  
+  if(letters[0] == 1) printf("READY\n");
   /* Reading stdin for jshell commands */
   while(get_line(is) > -1) {
     /*  IGNORE: Ingore stdin */
@@ -136,7 +135,6 @@ int main(int argc, char *argv[]) {
     } 
     /*  COMMAND: Anything else is a command; add it to the list */
     else { 
-      // printf("%d - %s", is->NF, is->text1);
       add_command(com, is); }
   }
 
