@@ -18,20 +18,37 @@ typedef struct{
   Dllist comlist;       /* I use this to incrementally read the commands.*/ 
 } Command;
 
-void free_argvs(Command *c) {
-  for(int i = 0; i < c->n_commands; i++) {
-    for(int j = 0; j < c->argcs[i]; j++)      /* Iterate through each argv */
-      free(c->argvs[i][j]);
-    free(c->argvs[i]);                        /* Free argv */
-  } 
-  free(c->argvs);                             /* Free argvs */
+
+/* Free individual argv and contents */
+void free_argv(char **argv, size_t size) {
+  for(size_t i = 0; i < size; i++)
+    free(argv[i]);
+  free(argv);
+} 
+
+void free_contents(Command *c) {
+  Dllist tmp;
+  int index = 0;
+  dll_traverse(tmp, c->comlist) {
+    free_argv((char**)tmp->val.v, c->argcs[index++]);
+  }
 }
 
 void free_command(Command *c) {
+  if(c->argvs != NULL) {
+    /* Iterate through argvs and free each argv with free_argv */
+    for(int i = 0; i < c->n_commands; i++)
+      free_argv(c->argvs[i], c->argcs[i]);
+    free(c->argvs);
+  }
+  else {
+    /* Free dllist argvs if choose to use dllist instead of c->argvs */
+    free_contents(c);
+  }
+
+  if(c->argcs != NULL) free(c->argcs);
   if(c->stdinp != NULL) free(c->stdinp);
   if(c->stdoutp != NULL) free(c->stdoutp);
-  if(c->argvs != NULL) free_argvs(c);
-  if(c->argcs != NULL) free(c->argcs);
   free_dllist(c->comlist);
   free(c);
 }
@@ -68,10 +85,10 @@ void add_command(Command *c, IS is) {
   c->argcs[c->n_commands++] = is->NF;
 
   /* Allocate memory for argvs and store them in dllist */
-  char **tmp = (char**)malloc(sizeof(char*) * is->NF);
+  char **tmp = (char**)malloc(sizeof(char*) * (is->NF + 1));
   for(int i = 0; i < is->NF; i++) { tmp[i] = strdup(is->fields[i]); }
   /* add extra index for NULL terminating */
-  // tmp[is->NF] = NULL;
+  tmp[is->NF] = NULL;
   dll_append(c->comlist, new_jval_v(tmp));
 }
 
@@ -138,7 +155,7 @@ int main(int argc, char *argv[]) {
       add_command(com, is); }
   }
 
-  move_argvs(com);
+  // move_argvs(com);
   
 
   jettison_inputstruct(is);
