@@ -1,0 +1,3 @@
+[submodule "labs/proj8/labs/proj8/utk-gradeall"]
+	path = labs/proj8/labs/proj8/utk-gradeall
+	url = https://github.com/very-amused/utk-gradeall.git

@@ -26,37 +26,45 @@ typedef struct{
 } Command;
 
 
-/* Free individual argv and contents */
 void free_argv(char **argv, size_t size) {
-  for(size_t i = 0; i < size; i++)
-    free(argv[i]);
+  for(size_t i = 0; i < size; i++) free(argv[i]);
   free(argv);
-} 
-
-void free_contents(Command *c) {
-  Dllist tmp;
-  int index = 0;
-  dll_traverse(tmp, c->comlist) {
-    free_argv((char**)tmp->val.v, c->argcs[index++]);
-  }
 }
 
-void free_command(Command *c) {
+void free_argvs(Command *c) {
+  int i = 0;
+
   if(c->argvs != NULL) {
     /* Iterate through argvs and free each argv with free_argv */
-    for(int i = 0; i < c->n_commands; i++)
+    for(i = 0; i < c->n_commands; i++)
       free_argv(c->argvs[i], c->argcs[i]);
     free(c->argvs);
   }
   else {
     /* Free dllist argvs if choose to use dllist instead of c->argvs */
-    free_contents(c);
+    Dllist tmp;
+    dll_traverse(tmp, c->comlist)
+      free_argv((char**)tmp->val.v, c->argcs[i++]);
   }
+  free_dllist(c->comlist);
+}
 
+void reset_command(Command *c) {
+  c->append_stdout = NOAPPEND;
+  c->wait = WAIT;
+  c->n_commands = 0;
+  free(c->stdinp);  c->stdinp = NULL;
+  free(c->stdoutp); c->stdoutp = NULL;
+  free_argvs(c);
+  c->comlist = new_dllist();
+}
+
+
+void free_command(Command *c) {
+  free_argvs(c);
   if(c->argcs != NULL) free(c->argcs);
   if(c->stdinp != NULL) free(c->stdinp);
   if(c->stdoutp != NULL) free(c->stdoutp);
-  free_dllist(c->comlist);
   free(c);
 }
 
@@ -75,10 +83,10 @@ Command* make_command() {
   return c;
 }
 
+
 void move_argvs(Command *c) {
   Dllist tmp;
   int index = 0;
-
   /* Allocate space for argvs and copy over from comlist */
   c->argvs = (char***)malloc(sizeof(char**) * c->n_commands);
   dll_traverse(tmp, c->comlist) {
@@ -123,6 +131,7 @@ void print_command(Command *c) {
   printf("\n");
 }
 
+
 /* Redirects stdin from input */
 void redirect_input(const char *input) {
   int fd = open(input, O_RDONLY);
@@ -133,6 +142,7 @@ void redirect_input(const char *input) {
   dup2(fd, 0);
   close(fd);
 }
+
 
 /* Redirects stdout to output and appends/truncates */
 void redirect_output(const char *output, int append) {
@@ -149,6 +159,7 @@ void redirect_output(const char *output, int append) {
   dup2(fd, 1);
   close(fd);
 }
+
 
 void execute_command(Command *c) {
   int pid, status;
@@ -172,9 +183,30 @@ void execute_command(Command *c) {
   }
 }
 
+
 void read_is(Command *c, IS is, int *letters) {
-  
+  /* Reading stdin for jshell commands */
+  while(get_line(is) > -1) {
+    if(is->fields[0][0] == '#' || is->NF == 0)    /* IGNORE */
+      continue;
+    else if(is->fields[0][0] == '<')              /* STDIN */
+      c->stdinp = strdup(is->fields[1]);
+    else if(is->fields[0][0] == '>') {            /* STDOUT */
+      c->stdoutp = strdup(is->fields[1]);
+      if(strcmp(is->fields[0], ">>") == 0)        /* Append */
+        c->append_stdout = 1;
+    } 
+    else if(strcmp(is->fields[0], "NOWAIT") == 0) /* WAIT */
+      c->wait = NOWAIT;
+    else if(strcmp(is->fields[0], "END") == 0) {  /* END */
+      if(letters[1]== 1) print_command(c); 
+      return;
+    } 
+    else add_command(c, is);                      /* COMMAND */
+  }
 }
+
+
 int main(int argc, char *argv[]) {
   IS is = new_inputstruct(NULL);                  /* input proccessing */ 
   Command *com = make_command();                  /* structure for storing commands */
@@ -188,37 +220,18 @@ int main(int argc, char *argv[]) {
     letters[1] = strchr(argv[1], 'p') != NULL;
     letters[2] = strchr(argv[1], 'n') != NULL;
   }
-
-
-  if(letters[0] == 1) printf("READY\n\n");
-  /* Reading stdin for jshell commands */
-  while(get_line(is) > -1) {
-    /*  IGNORE: Ingore stdin */
-    if(is->fields[0][0] == '#' || is->NF == 0) continue;
-    /*  STDIN: Redirect stdin from file to first child process */
-    else if(is->fields[0][0] == '<') { com->stdinp = strdup(is->fields[1]); } 
-    /*  STDOUT: Redirect stdout of last child process */
-    else if(is->fields[0][0] == '>') {
-      com->stdoutp = strdup(is->fields[1]);
-      if(strcmp(is->fields[0], ">>") == 0) com->append_stdout = 1;    // Append
-    } 
-    /*  WAIT */
-    else if(strcmp(is->fields[0], "NOWAIT") == 0) com->wait = NOWAIT;
-    /*  END: Break input and process commands */
-    else if(strcmp(is->fields[0], "END") == 0) {
-      if(letters[1]== 1) print_command(com); 
-      break;
-    } 
-    /*  COMMAND: Anything else is a command; add it to the list */
-    else { 
-      add_command(com, is); }
-  }
-
-  move_argvs(com);
   
-  if(!letters[2]) {
-    execute_command(com);
+  while(1) {
+    if(letters[0] == 1) printf("READY\n\n");
+    read_is(com, is, letters);
+    move_argvs(com);
+
+    if(!letters[2])
+      execute_command(com);
+    
+    reset_command(com);
   }
+  
   jettison_inputstruct(is);
   free_command(com);
   return 0;
