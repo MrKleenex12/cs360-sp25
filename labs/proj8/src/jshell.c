@@ -23,7 +23,7 @@ typedef struct{
   int wait;             /* Boolean for whether I should wait.*/ 
   int n_commands;       /* The number of commands that I have to execute*/ 
   int *argcs;           /* argcs[i] is argc_tmp for the i-th command*/ 
-  char ***argvs;        /* argcv[i] is the argv_tmp array for the i-th command*/ 
+  char ***argvs;        /* argcv[i] is the argv array for the i-th command*/ 
   Dllist comlist;       /* I use this to incrementally read the commands.*/ 
 } Command;
 
@@ -217,18 +217,18 @@ int read_is(Command *c, IS is, int *letters) {
 }
 
 
-int main(int argc_tmp, char *argv_tmp[]) {
-  IS is = new_inputstruct(NULL);                  /* input proccessing */ 
-  Command *com = make_command();                  /* structure for storing commands */
+int main(int argc_tmp, char *argv[]) {
+  IS is = new_inputstruct(NULL);                  /* Input proccessing */ 
+  Command *com = make_command();                  /* Structure for storing commands */
   Dllist tmp;
 
   /*  Use char array for first commmand line argument
       set index to 1 if letter was found */
   int letters[] = {0, 0, 0};
   if (argc_tmp == 2) {
-    letters[0] = strchr(argv_tmp[1], 'r') != NULL;
-    letters[1] = strchr(argv_tmp[1], 'p') != NULL;
-    letters[2] = strchr(argv_tmp[1], 'n') != NULL;
+    letters[0] = strchr(argv[1], 'r') != NULL;
+    letters[1] = strchr(argv[1], 'p') != NULL;
+    letters[2] = strchr(argv[1], 'n') != NULL;
   }
   
   while(1) {
