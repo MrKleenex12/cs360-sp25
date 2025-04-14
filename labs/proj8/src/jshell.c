@@ -121,11 +121,14 @@ void print_command(Command *c) {
 void execute_command(Command *c) {
   int pid, status;
   
-  
+  /* FLUSH STDIN, STDOUT, AND STDERR BEFORE ANY FORKS */ 
+  fflush(stdin);
+  fflush(stdout);
+  fflush(stderr);
   pid = fork(); 
 
   if(pid == 0) {
-    (void) execvp("cat", c->argvs[0]);
+    (void) execvp(c->argvs[0][0], c->argvs[0]);
     perror("execvp failed in execute_command:");
     exit(1);
   } else {
@@ -140,7 +143,7 @@ int main(int argc, char *argv[]) {
 
   /*  Use char array for first commmand line argument
       set index to 1 if letter was found */
-  char letters[] = {0, 0, 0};
+  int letters[] = {0, 0, 0};
   if (argc == 2) {
     letters[0] = strchr(argv[1], 'r') != NULL;
     letters[1] = strchr(argv[1], 'p') != NULL;
@@ -175,8 +178,9 @@ int main(int argc, char *argv[]) {
 
   move_argvs(com);
   
-  execute_command(com);
-
+  if(!letters[2]) {
+    execute_command(com);
+  }
   jettison_inputstruct(is);
   free_command(com);
   return 0;
