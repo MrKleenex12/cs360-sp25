@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 #include "fields.h"
 #include "dllist.h"
@@ -75,7 +76,7 @@ void move_argvs(Command *c) {
   int index = 0;
 
   /* Allocate space for argvs and copy over from comlist */
-  c->argvs = (char***)malloc(sizeof(char*) * c->n_commands);
+  c->argvs = (char***)malloc(sizeof(char**) * c->n_commands);
   dll_traverse(tmp, c->comlist) {
     c->argvs[index++] = (char**)tmp->val.v;
   }
@@ -97,7 +98,7 @@ void add_command(Command *c, IS is) {
 
 void print_command(Command *c) {
   printf("stdin:    %s\n", c->stdinp);
-  printf("stdout:   %s (Append=%d)\n", c->stdinp, c->append_stdout);
+  printf("stdout:   %s (Append=%d)\n", c->stdoutp, c->append_stdout);
   printf("N_Commands:  %d\n", c->n_commands);
   printf("Wait:        %d\n", c->wait);
 
@@ -118,8 +119,36 @@ void print_command(Command *c) {
   printf("\n");
 }
 
+/* Redirects stdin from input */
+void redirect_input(const char *input) {
+  int fd = open(input, O_RDONLY);
+  if(fd < 0) {
+    perror("fd for stdin failed");
+    exit(1);
+  }
+  dup2(fd, 0);
+  close(fd);
+}
+
+/* Redirects stdout to output and appends/truncates */
+void redirect_output(const char *output, int append) {
+  int fd;
+  if(append == 1) 
+    fd = open(output, O_WRONLY | O_CREAT| O_APPEND, 0644);
+  else  
+    fd = open(output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+  if(fd < 0) {
+    perror("fd for stdout failed");
+    exit(1);
+  }
+  dup2(fd, 1);
+  close(fd);
+}
+
 void execute_command(Command *c) {
   int pid, status;
+  int command_count = 0;
   
   /* FLUSH STDIN, STDOUT, AND STDERR BEFORE ANY FORKS */ 
   fflush(stdin);
@@ -128,11 +157,14 @@ void execute_command(Command *c) {
   pid = fork(); 
 
   if(pid == 0) {
+    if(c->stdinp != NULL) redirect_input(c->stdinp);
+    if(c->stdoutp != NULL) redirect_output(c->stdoutp, c->append_stdout);
+
     (void) execvp(c->argvs[0][0], c->argvs[0]);
     perror("execvp failed in execute_command:");
     exit(1);
   } else {
-    wait(&status);
+    if(c->wait == 1) wait(&status);
   }
 }
 
