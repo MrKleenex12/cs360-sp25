@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
 #include "fields.h"
 #include "dllist.h"
 #include "jval.h"
@@ -113,6 +115,22 @@ void print_command(Command *c) {
     printf("\n");
     index++;
   }
+  printf("\n");
+}
+
+void execute_command(Command *c) {
+  int pid, status;
+  
+  
+  pid = fork(); 
+
+  if(pid == 0) {
+    (void) execvp("cat", c->argvs[0]);
+    perror("execvp failed in execute_command:");
+    exit(1);
+  } else {
+    wait(&status);
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -131,7 +149,7 @@ int main(int argc, char *argv[]) {
 
 
   /* TODO program one command execution */  
-  if(letters[0] == 1) printf("READY\n");
+  if(letters[0] == 1) printf("READY\n\n");
   /* Reading stdin for jshell commands */
   while(get_line(is) > -1) {
     /*  IGNORE: Ingore stdin */
@@ -155,8 +173,9 @@ int main(int argc, char *argv[]) {
       add_command(com, is); }
   }
 
-  // move_argvs(com);
+  move_argvs(com);
   
+  execute_command(com);
 
   jettison_inputstruct(is);
   free_command(com);
