@@ -26,42 +26,42 @@ typedef struct{
 } Command;
 
 
-void free_argv(char **argv, size_t size) {
-  for(size_t i = 0; i < size; i++) free(argv[i]);
-  free(argv);
-}
-
 void free_argvs(Command *c) {
-  int i = 0;
+  /* Free Dllist and then free argvs needed */
+  Dllist tmp;
+  char **argv;
+  int argc;
+  int index = 0;
 
-  if(c->argvs != NULL) {
-    /* Iterate through argvs and free each argv with free_argv */
-    for(i = 0; i < c->n_commands; i++)
-      free_argv(c->argvs[i], c->argcs[i]);
-    free(c->argvs);
-  }
-  else {
-    /* Free dllist argvs if choose to use dllist instead of c->argvs */
-    Dllist tmp;
-    dll_traverse(tmp, c->comlist)
-      free_argv((char**)tmp->val.v, c->argcs[i++]);
+  dll_traverse(tmp, c->comlist) {
+    argv = (char**)tmp->val.v;
+    argc = c->argcs[index++];
+    for(int i = 0; i < argc; i++) free(argv[i]);
+    free(argv);
   }
   free_dllist(c->comlist);
+  if(c->argvs != NULL) free(c->argvs);
 }
 
+
 void reset_command(Command *c) {
+  /* Free and reset all pointers */
+  free_argvs(c);    c->argvs = NULL;
+  free(c->stdinp);  c->stdinp = NULL;
+  free(c->stdoutp); c->stdoutp = NULL;
+  c->comlist = new_dllist();
+  /* Reset all int values */
   c->append_stdout = NOAPPEND;
   c->wait = WAIT;
   c->n_commands = 0;
-  free(c->stdinp);  c->stdinp = NULL;
-  free(c->stdoutp); c->stdoutp = NULL;
-  free_argvs(c);
-  c->comlist = new_dllist();
 }
 
 
-void free_command(Command *c) {
+void free_all(Command *c, IS is) {
+  jettison_inputstruct(is);
+  /* free memory in dllist first, then free c->argvs */
   free_argvs(c);
+  if(c->argvs != NULL) free(c->argvs);
   if(c->argcs != NULL) free(c->argcs);
   if(c->stdinp != NULL) free(c->stdinp);
   if(c->stdoutp != NULL) free(c->stdoutp);
@@ -87,6 +87,7 @@ Command* make_command() {
 void move_argvs(Command *c) {
   Dllist tmp;
   int index = 0;
+
   /* Allocate space for argvs and copy over from comlist */
   c->argvs = (char***)malloc(sizeof(char**) * c->n_commands);
   dll_traverse(tmp, c->comlist) {
@@ -101,9 +102,8 @@ void add_command(Command *c, IS is) {
 
   /* Allocate memory for argvs and store them in dllist */
   char **tmp = (char**)malloc(sizeof(char*) * (is->NF + 1));
-  for(int i = 0; i < is->NF; i++) { tmp[i] = strdup(is->fields[i]); }
-  /* add extra index for NULL terminating */
-  tmp[is->NF] = NULL;
+  for(int i = 0; i < is->NF; i++) tmp[i] = strdup(is->fields[i]);
+  tmp[is->NF] = NULL;     /* add extra index for NULL terminating */
   dll_append(c->comlist, new_jval_v(tmp));
 }
 
@@ -128,6 +128,7 @@ void print_command(Command *c) {
     printf("\n");
     index++;
   }
+  if(c->argvs != NULL) printf("argvs not empty\n");
   printf("\n");
 }
 
@@ -175,7 +176,8 @@ void execute_command(Command *c) {
     if(c->stdinp != NULL) redirect_input(c->stdinp);
     if(c->stdoutp != NULL) redirect_output(c->stdoutp, c->append_stdout);
 
-    (void) execvp(c->argvs[0][0], c->argvs[0]);
+    char **argv = (char**)dll_first(c->comlist)->val.v;
+    (void) execvp(argv[0], argv);
     perror("execvp failed in execute_command:");
     exit(1);
   } else {
@@ -184,7 +186,7 @@ void execute_command(Command *c) {
 }
 
 
-void read_is(Command *c, IS is, int *letters) {
+int read_is(Command *c, IS is, int *letters) {
   /* Reading stdin for jshell commands */
   while(get_line(is) > -1) {
     if(is->fields[0][0] == '#' || is->NF == 0)    /* IGNORE */
@@ -200,10 +202,13 @@ void read_is(Command *c, IS is, int *letters) {
       c->wait = NOWAIT;
     else if(strcmp(is->fields[0], "END") == 0) {  /* END */
       if(letters[1]== 1) print_command(c); 
-      return;
+      return 0;
     } 
+    else if(strcmp(is->fields[0], "BREAK") == 0)  /* BREAK */
+      return -1;
     else add_command(c, is);                      /* COMMAND */
   }
+  return 0;
 }
 
 
@@ -223,16 +228,15 @@ int main(int argc, char *argv[]) {
   
   while(1) {
     if(letters[0] == 1) printf("READY\n\n");
-    read_is(com, is, letters);
+    int result = read_is(com, is, letters);
+    if(result == -1) break;
     move_argvs(com);
 
-    if(!letters[2])
-      execute_command(com);
+    if(!letters[2]) execute_command(com);
     
     reset_command(com);
   }
-  
-  jettison_inputstruct(is);
-  free_command(com);
+
+  free_all(com, is);
   return 0;
 }
