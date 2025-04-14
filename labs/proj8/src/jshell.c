@@ -8,6 +8,10 @@
 #include "dllist.h"
 #include "jval.h"
 
+#define APPEND 1
+#define NOAPPEND 0
+#define WAIT 1
+#define NOWAIT 0
 
 /* Copied from Dr. Jantz lab 8 writeup */
 typedef struct{
@@ -60,8 +64,8 @@ void free_command(Command *c) {
 Command* make_command() {
   /* Allocate command struct and default values */
   Command *c = (Command*)malloc(sizeof(Command));
-  c->append_stdout = 0;
-  c->wait = 1;
+  c->append_stdout = NOAPPEND;
+  c->wait = WAIT;
   c->n_commands = 0;
   c->stdinp = NULL;
   c->stdoutp = NULL;
@@ -164,10 +168,13 @@ void execute_command(Command *c) {
     perror("execvp failed in execute_command:");
     exit(1);
   } else {
-    if(c->wait == 1) wait(&status);
+    if(c->wait == WAIT) wait(&status);
   }
 }
 
+void read_is(Command *c, IS is, int *letters) {
+  
+}
 int main(int argc, char *argv[]) {
   IS is = new_inputstruct(NULL);                  /* input proccessing */ 
   Command *com = make_command();                  /* structure for storing commands */
@@ -183,7 +190,6 @@ int main(int argc, char *argv[]) {
   }
 
 
-  /* TODO program one command execution */  
   if(letters[0] == 1) printf("READY\n\n");
   /* Reading stdin for jshell commands */
   while(get_line(is) > -1) {
@@ -197,7 +203,7 @@ int main(int argc, char *argv[]) {
       if(strcmp(is->fields[0], ">>") == 0) com->append_stdout = 1;    // Append
     } 
     /*  WAIT */
-    else if(strcmp(is->fields[0], "NOWAIT") == 0) com->wait = 0;
+    else if(strcmp(is->fields[0], "NOWAIT") == 0) com->wait = NOWAIT;
     /*  END: Break input and process commands */
     else if(strcmp(is->fields[0], "END") == 0) {
       if(letters[1]== 1) print_command(com); 
