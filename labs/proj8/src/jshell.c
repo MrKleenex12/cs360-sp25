@@ -1,6 +1,6 @@
 /* Larry Wang - 4/14/25
    Lab 8 - Jshell*/
-   
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +27,7 @@ typedef struct{
   int wait;             /* Boolean for whether I should wait.*/ 
   int n_commands;       /* The number of commands that I have to execute*/ 
   int *argcs;           /* argcs[i] is argc_tmp for the i-th command*/ 
-  char ***argvs;        /* argcv[i] is the argv array for the i-th command*/ 
+  // char ***argvs;        /* argcv[i] is the argv array for the i-th command*/ 
   Dllist list;          /* I use this to incrementally read the commands.*/ 
 } Command;
 
@@ -53,7 +53,7 @@ void free_list(Command *c) {
     NOTE: argcs & list are not deallocated at until the end */
 void reset_command(Command *c) {
   free_list(c);
-  if(c->argvs) { free(c->argvs); c->argvs = NULL; }
+  // if(c->argvs) { free(c->argvs); c->argvs = NULL; }
   free(c->stdinp);  c->stdinp = NULL;
   free(c->stdoutp); c->stdoutp = NULL;
 
@@ -72,7 +72,7 @@ void free_all(Command *c, IS is) {
   /* free memory in dllist first, then free c->argvs */
   free_list(c);
   free_dllist(c->list);
-  if(c->argvs != NULL) free(c->argvs);
+  // if(c->argvs != NULL) free(c->argvs);
   if(c->argcs != NULL) free(c->argcs);
   if(c->stdinp != NULL) free(c->stdinp);
   if(c->stdoutp != NULL) free(c->stdoutp);
@@ -88,7 +88,7 @@ Command* make_command() {
   c->n_commands = 0;
   c->stdinp = NULL;
   c->stdoutp = NULL;
-  c->argvs = NULL;
+  // c->argvs = NULL;
   c->argcs = (int*)malloc(BUFSIZ);
   c->list = new_dllist();
   return c;
@@ -100,9 +100,9 @@ void move_argvs(Command *c) {
   int index = 0;
 
   /* Allocate space for argvs and copy over from list */
-  c->argvs = (char***)malloc(sizeof(char**) * c->n_commands);
+  // c->argvs = (char***)malloc(sizeof(char**) * c->n_commands);
   dll_traverse(tmp, c->list) {
-    c->argvs[index++] = (char**)tmp->val.v;
+    // c->argvs[index++] = (char**)tmp->val.v;
   }
 }
 
@@ -186,7 +186,7 @@ void piping(Command *c) {
   int N = c->n_commands;
   JRB tmp;
   JRB pids = make_jrb();
-  // Dllist l = c->list->flink;
+  Dllist l = c->list->flink;
 
   /* INSIDE FORK LOOP*/
   for(int i = 0; i < N; i++) {
@@ -231,12 +231,11 @@ void piping(Command *c) {
       }
 
       // Call execvp to execute command on null terminated argv
-      // char **argv_tmp = (char**)l->val.v;
-      // l = l->flink;
-      // execvp(argv_tmp[0], argv_tmp);
-      // perror(argv_tmp[0]);
-      execvp(c->argvs[i][0], c->argvs[i]);
-      perror(c->argvs[i][0]);
+      char **argv_tmp = (char**)l->val.v;
+      execvp(argv_tmp[0], argv_tmp);
+      perror(argv_tmp[0]);
+      // execvp(c->argvs[i][0], c->argvs[i]);
+      // perror(c->argvs[i][0]);
       exit(1);
     }
     /* PARENT */
@@ -255,6 +254,7 @@ void piping(Command *c) {
       perror("piping() - fork:");
       exit(1);
     }
+    l = l->flink;
   }
   if(c->wait == WAIT) {
     int status;
@@ -304,7 +304,7 @@ int main(int argc_tmp, char *argv[]) {
       com->wait = NOWAIT;
     else if(strcmp(is->fields[0], "END") == 0) {  /* END */
       if(letters[1]== 1) print_command(com); 
-      move_argvs(com);
+      // move_argvs(com);
       /* Run commands if no 'n' and actual commands given */
       if(!letters[2] && !dll_empty(com->list)) {
         piping(com);
