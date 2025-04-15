@@ -274,7 +274,7 @@ void piping(Command *c) {
 }
 
 
-int read_is(Command *c, IS is, int *letters) {
+void read_is(Command *c, IS is, int *letters) {
   /* Reading stdin for jshell commands */
   while(get_line(is) >= 0) {
 
@@ -292,14 +292,10 @@ int read_is(Command *c, IS is, int *letters) {
       c->wait = NOWAIT;
     else if(strcmp(is->fields[0], "END") == 0) {  /* END */
       if(letters[1]== 1) print_command(c); 
-      return 0;
+      return;
     } 
-    
-    else if(strcmp(is->fields[0], "BREAK") == 0)  /* BREAK */
-      return -1;
     else add_command(c, is);                      /* COMMAND */
   }
-  return 0;
 }
 
 
