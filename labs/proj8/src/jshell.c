@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include "jrb.h"
 #include "fields.h"
 #include "dllist.h"
 #include "jval.h"
@@ -28,8 +29,8 @@ typedef struct{
 } Command;
 
 
-/* Free strings in c->list and then free c->argvs if needed */
-void free_argvs(Command *c) {
+/* Free strings in c->list */
+void free_list(Command *c) {
   Dllist tmp;
   char **argv_tmp;
   int argc_tmp;
@@ -42,14 +43,14 @@ void free_argvs(Command *c) {
     for(int i = 0; i < argc_tmp; i++) free(argv_tmp[i]);
     free(argv_tmp);
   }
-  if(c->argvs != NULL) free(c->argvs);
 }
 
 
 /*  Reset pointers and values to reset command before READY
     NOTE: argcs & list are not deallocated at until the end */
 void reset_command(Command *c) {
-  free_argvs(c);    c->argvs = NULL;
+  free_list(c);
+  if(c->argvs) { free(c->argvs); c->argvs = NULL; }
   free(c->stdinp);  c->stdinp = NULL;
   free(c->stdoutp); c->stdoutp = NULL;
 
@@ -66,7 +67,7 @@ void reset_command(Command *c) {
 void free_all(Command *c, IS is) {
   jettison_inputstruct(is);
   /* free memory in dllist first, then free c->argvs */
-  free_argvs(c);
+  free_list(c);
   free_dllist(c->list);
   if(c->argvs != NULL) free(c->argvs);
   if(c->argcs != NULL) free(c->argcs);
@@ -145,10 +146,13 @@ void print_command(Command *c) {
 void redirect_stdin(const char *input) {
   int fd = open(input, O_RDONLY);
   if(fd < 0) {
-    perror("fd for stdin failed");
+    perror("fd for input failed");
     exit(1);
   }
-  dup2(fd, 0);
+  if(dup2(fd, STDIN_FILENO) < 0) {
+    perror("dup2 for stdin failed:");
+    exit(1);
+  } 
   close(fd);
 }
 
@@ -161,35 +165,108 @@ void redirect_stdout(const char *output, int append) {
     fd = open(output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
   if(fd < 0) {
-    perror("fd for stdout failed");
+    perror("fd for output failed");
     exit(1);
   }
-  dup2(fd, 1);
+  if(dup2(fd, STDOUT_FILENO) < 0) {
+    perror("dup2 for stdout failed:");
+    exit(1);
+  } 
   close(fd);
 }
 
 
-void execute_command(Command *c) {
-  int pid, status;
-  int command_count = 0;
-  
-  /* FLUSH STDIN, STDOUT, AND STDERR BEFORE ANY FORKS */ 
-  fflush(stdin);
-  fflush(stdout);
-  fflush(stderr);
-  pid = fork(); 
+void piping(Command *c) {
+  pid_t pid;
+  int prev_read_fd = 0;
+  int pipefd[2];
+  int status;
+  int N = c->n_commands;
+  JRB tmp;
+  JRB pids = make_jrb();
 
-  if(pid == 0) {
-    if(c->stdinp != NULL) redirect_stdin(c->stdinp);
-    if(c->stdoutp != NULL) redirect_stdout(c->stdoutp, c->append);
-    /* Call execvp to execute command on null terminated argv */
-    char **argv_tmp = (char**)dll_first(c->list)->val.v;
-    (void) execvp(argv_tmp[0], argv_tmp);
-    perror("execvp failed in execute_command:");
-    exit(1);
-  } else {
-    if(c->wait == WAIT) wait(&status);
+  /* INSIDE FORK LOOP*/
+  for(int i = 0; i < N; i++) {
+    /* Create pipe if i < N-1 */
+    if(i < N-1) {
+      if(pipe(pipefd) < 0) {
+        perror("piping() - error creating pipes:");
+        exit(1);
+      }
+    }
+
+    /* FLUSH STDIN, STDOUT, AND STDERR BEFORE ANY FORKS */ 
+    fflush(stdin);
+    fflush(stdout);
+    fflush(stderr);
+    pid = fork(); 
+
+
+    /* CHILD */
+    if(pid == 0) {
+      /* Very first stdin and very final stdout */
+      if(i == 0 && c->stdinp != NULL)     redirect_stdin(c->stdinp);
+      if(i == N-1 && c->stdoutp != NULL)  redirect_stdout(c->stdoutp, c->append);
+
+      /* Middle process stdin */
+      if(i > 0) {
+        if(dup2(prev_read_fd, STDIN_FILENO) == -1) {
+          perror("Mid Proc STDIN:");
+          exit(1);
+        }
+        close(prev_read_fd);
+      }
+
+      /* Middle process stdout */
+      if(i < N-1) {
+        if(dup2(pipefd[1], STDOUT_FILENO) == -1) {
+          perror("Mid Proc STDOUT:");
+          exit(1);
+        }
+        close(pipefd[0]);
+        close(pipefd[1]);
+      }
+
+      /* Call execvp to execute command on null terminated argv
+      char **argv_tmp = (char**)dll_first(c->list)->val.v;
+      (void) execvp(argv_tmp[0], argv_tmp);
+      perror("execvp failed in piping():");
+      exit(1);
+      */
+      execvp(c->argvs[i][0], c->argvs[i]);
+      perror(c->argvs[i][0]);
+      exit(1);
+    }
+    /* PARENT */
+    else if(pid > 0) {
+      /* Don't wait inside fork loop */
+      if(c->wait == WAIT) jrb_insert_int(pids, pid, new_jval_i(0));
+      /* Skip if only one command */
+      if(N == 1) continue;
+      /* THe rest of the body is if more than one command */
+      if(prev_read_fd != 0) close(prev_read_fd);
+      if(i < N-1) {
+        close(pipefd[1]);
+        prev_read_fd = pipefd[0];
+      }
+    }
+    /* ERROR */
+    else {                              
+      perror("piping() - fork:");
+      exit(1);
+    }
   }
+  if(c->wait == WAIT) {
+    /* OUTSIDE FORK LOOP */
+    while(!jrb_empty(pids)) {
+      pid = wait(&status);
+      tmp = jrb_find_int(pids, pid);
+      if(tmp != NULL) {
+        jrb_delete_node(tmp);
+      }
+    } 
+  }
+  jrb_free_tree(pids);
 }
 
 
@@ -244,8 +321,10 @@ int main(int argc_tmp, char *argv[]) {
       break;
 
     move_argvs(com);
-    if(!letters[2]) execute_command(com);
-    reset_command(com);
+    if(!letters[2] && !dll_empty(com->list)) {
+      piping(com);
+      reset_command(com);
+    }
   }
 
   free_all(com, is);
