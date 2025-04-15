@@ -274,31 +274,6 @@ void piping(Command *c) {
 }
 
 
-void read_is(Command *c, IS is, int *letters) {
-  /* Reading stdin for jshell commands */
-  while(get_line(is) >= 0) {
-
-    if(is->fields[0][0] == '#' || is->NF == 0)    /* IGNORE */
-      continue;
-    else if(is->fields[0][0] == '<')              /* STDIN */
-      c->stdinp = strdup(is->fields[1]);
-    else if(is->fields[0][0] == '>') {            /* STDOUT */
-      c->stdoutp = strdup(is->fields[1]);
-      if(strcmp(is->fields[0], ">>") == 0)        /* Append */
-        c->append = 1;
-    } 
-
-    else if(strcmp(is->fields[0], "NOWAIT") == 0) /* WAIT */
-      c->wait = NOWAIT;
-    else if(strcmp(is->fields[0], "END") == 0) {  /* END */
-      if(letters[1]== 1) print_command(c); 
-      return;
-    } 
-    else add_command(c, is);                      /* COMMAND */
-  }
-}
-
-
 int main(int argc_tmp, char *argv[]) {
   IS is = new_inputstruct(NULL);                  /* Input proccessing */ 
   Command *com = make_command();                  /* Structure for storing commands */
@@ -315,12 +290,31 @@ int main(int argc_tmp, char *argv[]) {
   
   if(letters[0] == 1) printf("READY\n\n");
 
-  read_is(com, is, letters);
+  /* Reading stdin for jshell commands */
+  while(get_line(is) >= 0) {
 
-  // move_argvs(com);
-  if(!letters[2] && !dll_empty(com->list)) {
-    piping(com);
-    reset_command(com);
+    if(is->fields[0][0] == '#' || is->NF == 0)    /* IGNORE */
+      continue;
+    else if(is->fields[0][0] == '<')              /* STDIN */
+      com->stdinp = strdup(is->fields[1]);
+    else if(is->fields[0][0] == '>') {            /* STDOUT */
+      com->stdoutp = strdup(is->fields[1]);
+      if(strcmp(is->fields[0], ">>") == 0)        /* Append */
+        com->append = 1;
+    } 
+
+    else if(strcmp(is->fields[0], "NOWAIT") == 0) /* WAIT */
+      com->wait = NOWAIT;
+    else if(strcmp(is->fields[0], "END") == 0) {  /* END */
+      if(letters[1]== 1) print_command(com); 
+      // move_argvs(com);
+      /* Run commands if no 'n' and actual commands given */
+      if(!letters[2] && !dll_empty(com->list)) {
+        piping(com);
+        reset_command(com);
+      }
+    } 
+    else add_command(com, is);                    /* COMMAND */
   }
 
   free_all(com, is);
