@@ -276,7 +276,7 @@ void piping(Command *c) {
 
 int read_is(Command *c, IS is, int *letters) {
   /* Reading stdin for jshell commands */
-  while(get_line(is) > -1) {
+  while(get_line(is) >= 0) {
 
     if(is->fields[0][0] == '#' || is->NF == 0)    /* IGNORE */
       continue;
@@ -317,18 +317,14 @@ int main(int argc_tmp, char *argv[]) {
     letters[2] = strchr(argv[1], 'n') != NULL;
   }
   
-  while(1) {
-    if(letters[0] == 1) printf("READY\n\n");
+  if(letters[0] == 1) printf("READY\n\n");
 
-    int result = read_is(com, is, letters);
-    if(result == -1)  
-      break;
+  read_is(com, is, letters);
 
-    // move_argvs(com);
-    if(!letters[2] && !dll_empty(com->list)) {
-      piping(com);
-      reset_command(com);
-    }
+  // move_argvs(com);
+  if(!letters[2] && !dll_empty(com->list)) {
+    piping(com);
+    reset_command(com);
   }
 
   free_all(com, is);
