@@ -24,7 +24,7 @@ typedef struct{
   int wait;             /* Boolean for whether I should wait.*/ 
   int n_commands;       /* The number of commands that I have to execute*/ 
   int *argcs;           /* argcs[i] is argc_tmp for the i-th command*/ 
-  char ***argvs;        /* argcv[i] is the argv array for the i-th command*/ 
+  // char ***argvs;        /* argcv[i] is the argv array for the i-th command*/ 
   Dllist list;          /* I use this to incrementally read the commands.*/ 
 } Command;
 
@@ -50,7 +50,7 @@ void free_list(Command *c) {
     NOTE: argcs & list are not deallocated at until the end */
 void reset_command(Command *c) {
   free_list(c);
-  if(c->argvs) { free(c->argvs); c->argvs = NULL; }
+  // if(c->argvs) { free(c->argvs); c->argvs = NULL; }
   free(c->stdinp);  c->stdinp = NULL;
   free(c->stdoutp); c->stdoutp = NULL;
 
@@ -69,7 +69,7 @@ void free_all(Command *c, IS is) {
   /* free memory in dllist first, then free c->argvs */
   free_list(c);
   free_dllist(c->list);
-  if(c->argvs != NULL) free(c->argvs);
+  // if(c->argvs != NULL) free(c->argvs);
   if(c->argcs != NULL) free(c->argcs);
   if(c->stdinp != NULL) free(c->stdinp);
   if(c->stdoutp != NULL) free(c->stdoutp);
@@ -85,7 +85,7 @@ Command* make_command() {
   c->n_commands = 0;
   c->stdinp = NULL;
   c->stdoutp = NULL;
-  c->argvs = NULL;
+  // c->argvs = NULL;
   c->argcs = (int*)malloc(BUFSIZ);
   c->list = new_dllist();
   return c;
@@ -97,9 +97,9 @@ void move_argvs(Command *c) {
   int index = 0;
 
   /* Allocate space for argvs and copy over from list */
-  c->argvs = (char***)malloc(sizeof(char**) * c->n_commands);
+  // c->argvs = (char***)malloc(sizeof(char**) * c->n_commands);
   dll_traverse(tmp, c->list) {
-    c->argvs[index++] = (char**)tmp->val.v;
+    // c->argvs[index++] = (char**)tmp->val.v;
   }
 }
 
@@ -184,10 +184,11 @@ void piping(Command *c) {
   int N = c->n_commands;
   JRB tmp;
   JRB pids = make_jrb();
+  Dllist l = dll_first(c->list);
 
   /* INSIDE FORK LOOP*/
   for(int i = 0; i < N; i++) {
-    /* Create pipe if i < N-1 */
+    /* Create pipe if i < N-1 (aka N-1 pipes) */
     if(i < N-1) {
       if(pipe(pipefd) < 0) {
         perror("piping() - error creating pipes:");
@@ -208,7 +209,7 @@ void piping(Command *c) {
       if(i == 0 && c->stdinp != NULL)     redirect_stdin(c->stdinp);
       if(i == N-1 && c->stdoutp != NULL)  redirect_stdout(c->stdoutp, c->append);
 
-      /* Middle process stdin */
+      /* Middle process stdin & and N > 1 */
       if(i > 0) {
         if(dup2(prev_read_fd, STDIN_FILENO) == -1) {
           perror("Mid Proc STDIN:");
@@ -217,7 +218,7 @@ void piping(Command *c) {
         close(prev_read_fd);
       }
 
-      /* Middle process stdout */
+      /* Middle process stdout & N > 1 */
       if(i < N-1) {
         if(dup2(pipefd[1], STDOUT_FILENO) == -1) {
           perror("Mid Proc STDOUT:");
@@ -227,14 +228,17 @@ void piping(Command *c) {
         close(pipefd[1]);
       }
 
-      /* Call execvp to execute command on null terminated argv
+      /*
       char **argv_tmp = (char**)dll_first(c->list)->val.v;
       (void) execvp(argv_tmp[0], argv_tmp);
       perror("execvp failed in piping():");
       exit(1);
       */
-      execvp(c->argvs[i][0], c->argvs[i]);
-      perror(c->argvs[i][0]);
+      // Call execvp to execute command on null terminated argv
+      char **argv_tmp = (char**)l->val.v;
+      l = l->flink;
+      execvp(argv_tmp[0], argv_tmp);
+      perror(argv_tmp[0]);
       exit(1);
     }
     /* PARENT */
@@ -320,7 +324,7 @@ int main(int argc_tmp, char *argv[]) {
     if(result == -1)  
       break;
 
-    move_argvs(com);
+    // move_argvs(com);
     if(!letters[2] && !dll_empty(com->list)) {
       piping(com);
       reset_command(com);
