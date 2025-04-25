@@ -65,17 +65,6 @@ void set_ids(molecule *h1, molecule *h2, molecule *o) {
   // clang-format on
 }
 
-void send_signals(pthread_cond_t *c1, pthread_cond_t *c2) {
-  if(pthread_cond_signal(c1) != 0) {
-    perror("H signal error:");
-    exit(1);
-  }
-  if(pthread_cond_signal(c2) != 0) {
-    perror("O signal error:");
-    exit(1);
-  }
-}
-
 /* Hydrogen thread function looks to find matching h and o atom to make a
  * molecule. *arg is a bonding_arg value that holds custom structure as a
  * void*. If cannot make a molecule, add hydrogen to h_wait list and call
@@ -94,9 +83,7 @@ void *hydrogen(void *arg) {
   if(!dll_empty(g->h_wait) && !dll_empty(g->o_wait)) {
     molecule *H = get_atom(g->h_wait);
     molecule *O = get_atom(g->o_wait);
-    // printf("Found other two: %d & %d\n", H->id, O->id);
     set_ids(m, H, O); /* Set the three thread ids of each molecule struct */
-    print(m, H, O);
 
     // clang-format off
     if(pthread_cond_signal(H->condition) != 0) { perror("H: H signal error:"); exit(1); }
@@ -104,8 +91,8 @@ void *hydrogen(void *arg) {
     // clang-format on
     pthread_mutex_unlock(g->lock);
   } else {
+    /* Add to wait_list and call wait */
     dll_append(g->h_wait, new_jval_v((void *)m));
-    // printf("added %d to h_wait\n", m->id);
     if(pthread_cond_wait(m->condition, g->lock) != 0) {
       perror("H: wait failed");
       exit(1);
@@ -137,9 +124,7 @@ void *oxygen(void *arg) {
   if(dll_first(g->h_wait)->flink != g->h_wait) {
     molecule *H1 = get_atom(g->h_wait);
     molecule *H2 = get_atom(g->h_wait);
-    // printf("Found other two: %d & %d\n", H1->id, H2->id);
     set_ids(H1, H2, m); /* Set the three thread ids of each molecule struct */
-    print(H1, H2, m);
 
     // clang-format off
     if(pthread_cond_signal(H1->condition) != 0) { perror("O: H1 signal error:"); exit(1); }
@@ -147,8 +132,8 @@ void *oxygen(void *arg) {
     // clang-format on
     pthread_mutex_unlock(g->lock);
   } else {
+    /* Add to wait_list and call wait */
     dll_append(g->o_wait, new_jval_v((void *)m));
-    // printf("added %d to o_wait\n", m->id);
     if(pthread_cond_wait(m->condition, g->lock) != 0) {
       perror("O: wait failed");
       exit(1);
