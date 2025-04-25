@@ -42,6 +42,7 @@ molecule *make_molecule(int id) {
   return m;
 }
 
+/* Return node and delete from list */
 molecule *get_atom(Dllist l) {
   Dllist temp = dll_first(l);
   molecule *m = (molecule *)temp->val.v;
@@ -49,12 +50,13 @@ molecule *get_atom(Dllist l) {
   return m;
 }
 
-void print(molecule *h1, molecule *h2, molecule *o) {
+void print(molecule *h1, molecule *h2, molecule *o) { /* Debugger function */
   printf("h1: %d %d %d \n", h1->h[0], h1->h[1], h1->o);
   printf("h2: %d %d %d \n", h2->h[0], h2->h[1], h2->o);
   printf(" o: %d %d %d \n", o->h[0], o->h[1], o->o);
 }
 
+/* Set ids of all three atoms */
 void set_ids(molecule *h1, molecule *h2, molecule *o) {
   // clang-format off
   h1->h[0] = h1->id; h1->h[1] = h2->id; h1->o = o->id;
@@ -96,14 +98,10 @@ void *hydrogen(void *arg) {
     set_ids(m, H, O); /* Set the three thread ids of each molecule struct */
     print(m, H, O);
 
-    if(pthread_cond_signal(H->condition) != 0) {
-      perror("H: H signal error:");
-      exit(1);
-    }
-    if(pthread_cond_signal(O->condition) != 0) {
-      perror("H: O signal error:");
-      exit(1);
-    }
+    // clang-format off
+    if(pthread_cond_signal(H->condition) != 0) { perror("H: H signal error:"); exit(1); }
+    if(pthread_cond_signal(O->condition) != 0) { perror("H: O signal error:"); exit(1); }
+    // clang-format on
     pthread_mutex_unlock(g->lock);
   } else {
     dll_append(g->h_wait, new_jval_v((void *)m));
@@ -143,14 +141,10 @@ void *oxygen(void *arg) {
     set_ids(H1, H2, m); /* Set the three thread ids of each molecule struct */
     print(H1, H2, m);
 
-    if(pthread_cond_signal(H1->condition) != 0) {
-      perror("O: H1 signal error:");
-      exit(1);
-    }
-    if(pthread_cond_signal(H2->condition) != 0) {
-      perror("O: H2 signal error:");
-      exit(1);
-    }
+    // clang-format off
+    if(pthread_cond_signal(H1->condition) != 0) { perror("O: H1 signal error:"); exit(1); }
+    if(pthread_cond_signal(H2->condition) != 0) { perror("O: H2 signal error:"); exit(1); }
+    // clang-format on
     pthread_mutex_unlock(g->lock);
   } else {
     dll_append(g->o_wait, new_jval_v((void *)m));
