@@ -1,0 +1,11 @@
+chat_server
+chatty_chat_server
+laba-tester
+th_telnet1
+
+tmp-grader-stdout.txt
+tmp-grader-stderr.txt
+
+*.o
+*.html
+grade*
