@@ -1,6 +1,8 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "dllist.h"
 #include "fields.h"
@@ -8,12 +10,14 @@
 #include "jval.h"
 #include "sockettome.h"
 
+
 int main(int argc, char **argv) {
   char *hn;
-  int fd, port, sock;
-  FILE *fin, *fout;
-  FILE *stdin_to_socket[2];
-  FILE *socket_to_stdin[2];
+  void *rv;
+  int fd, port, *sock;
+  // FILE *fin, *fout;
+  // FILE *stdin_to_socket[2];
+  // FILE *socket_to_stdin[2];
   pthread_t tid;
 
   if(argc < 3) {
