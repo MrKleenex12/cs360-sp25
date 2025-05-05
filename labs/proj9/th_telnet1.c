@@ -1,12 +1,13 @@
 /*
- * CS360: th_telnet.c
+ * CS360: th_telnet1.c
  * Jim Plank
  */
 
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "socketfun.h"
+#include <unistd.h>
+#include "sockettome.h"
 
 void *inout(void *v)
 {
@@ -22,7 +23,7 @@ void *inout(void *v)
   }
 }
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   pthread_t tid, tid2;
   void *retval;

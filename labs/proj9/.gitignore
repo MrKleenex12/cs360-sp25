@@ -2,9 +2,13 @@ chat_server
 chatty_chat_server
 laba-tester
 th_telnet1
-sockettome.c
+th_telnet
+
 makefile
 *.dSYM
+.vscode
+
+sockettome.c
 
 tmp-grader-stdout.txt
 tmp-grader-stderr.txt
