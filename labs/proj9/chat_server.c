@@ -51,6 +51,13 @@ Client *make_client(int fd) {
   return c;
 }
 
+void *free_client(Client *c) {
+  fclose(c->fin);
+  fclose(c->fout);
+  free(c->name);
+  free(c);
+}
+
 /* Error check usage and CL arguments */
 void usage(int argc, char **argv, int *port) {
   if(argc < 3 || (*port = atoi(argv[1])) < 8000) {
@@ -66,25 +73,24 @@ void *room_thread(void *room) {
   return NULL;
 }
 
-void user_prompt(Global_Vars *g, char *buf) {
+// clang-format off
+int user_prompt(Global_Vars *g, char *buf) {
   Client *c = (Client *)g->c;
   int fd = fileno(c->fin);
   int n_objects;
 
-  // clang-format off
   if(write(fd, "\nEnter your chat name (no spaces):\n", 35) < 0) {
     perror("write:");
-    exit(1);
+    return -1;
   }
   // Ask for Name
-  if((n_objects = read(fd, buf, BUFSIZ)) < 0) { perror("read:"); exit(1); }
+  if((n_objects = read(fd, buf, BUFSIZ)) <= 0) { perror("read:"); return -1; }
   buf[n_objects-1] = '\0'; // 0 termminate name
   c->name = strdup(buf);
   // Ask for Chat Room
-  if(write(fd, "Enter chat room:\n", 17) < 0) { perror("write:"); exit(1); }
-  if((n_objects = read(fd, buf, BUFSIZ)) < 0) { perror("read:"); exit(1); }
+  if(write(fd, "Enter chat room:\n", 17) < 0) { perror("write:"); return -1; }
+  if((n_objects = read(fd, buf, BUFSIZ)) <= 0) { perror("read:"); return -1; }
   buf[n_objects-1] = '\0'; // 0 termminate Room name
-  // clang-format on
 
   // Check for correct Room name
   JRB tmp = jrb_find_str(g->rooms, buf);
@@ -94,14 +100,21 @@ void user_prompt(Global_Vars *g, char *buf) {
     fprintf(stderr, "Incorrect Room name\n");
     exit(1);
   }
-}
 
-void print_rooms(Global_Vars *g, char *buf) {
+  return 0;
+}
+// clang-format on
+
+int print_rooms(Global_Vars *g, char *buf) {
   Room *r;
   JRB jtmp;
   Dllist dtmp;
   int len;
 
+  if(fputs("Chat Rooms:\n\n", g->c->fout) < 0) {
+    perror("fputs:");
+    return -1;
+  }
   jrb_traverse(jtmp, g->rooms) {
     r = (Room *)jtmp->val.v;
     sprintf(buf, "%s:", jtmp->key.s);
@@ -113,9 +126,11 @@ void print_rooms(Global_Vars *g, char *buf) {
     }
     buf[len] = '\n';
     // clang-format off
-    if(fputs(buf, g->c->fout) < 0) { perror("fputs:"); exit(1); }
-    if(fflush(g->c->fout) < 0) { perror("fflush:"); exit(1); }
+    if(fputs(buf, g->c->fout) < 0) { perror("fputs:"); return -1; }
+    if(fflush(g->c->fout) < 0) { perror("fflush:"); return -1; }
     // clang-format on
+
+    return 0;
   }
 }
 
@@ -123,17 +138,17 @@ void print_rooms(Global_Vars *g, char *buf) {
 void *client_thread(void *arg) {
   Global_Vars *g = (Global_Vars *)arg;
   Client *c = g->c;
-  Room *r;
-  JRB jtmp;
-  Dllist dtmp;
   char buf[BUFSIZ];
 
-  if(fputs("Chat Rooms:\n\n", c->fout) < 0) {
-    perror("fputs:");
-    exit(1);
+  if(print_rooms(g, buf) != 0) {           // Print rooms and clients in it
+    free_client(c);
+    g->c = NULL;
   }
-  print_rooms(g, buf);  // Print rooms and clients in it
-  user_prompt(g, buf);  // Prompt user with username and Room
+  if(user_prompt(g, buf) != 0) {  // Prompt user with username and Room
+    free_client(c);
+    g->c = NULL;
+  }
+
   return NULL;
 }
 
