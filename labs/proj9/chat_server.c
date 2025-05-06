@@ -13,8 +13,8 @@
 typedef struct Room {
   Dllist clients;
   Dllist messages;
-  pthread_mutex_t *mutex;
-  pthread_cond_t *cond;
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
 } Room;
 
 typedef struct Client {
@@ -51,14 +51,14 @@ Client *make_client(int fd) {
   return c;
 }
 
-void *free_client(Client *c) {
+void free_client(Client *c) {
   fclose(c->fin);
   fclose(c->fout);
   free(c->name);
   free(c);
 }
 
-/* Error check usage and CL arguments */
+// Error check usage and CL arguments
 void usage(int argc, char **argv, int *port) {
   if(argc < 3 || (*port = atoi(argv[1])) < 8000) {
     fprintf(
@@ -69,7 +69,26 @@ void usage(int argc, char **argv, int *port) {
 }
 
 void *room_thread(void *room) {
-  // Room *r = (Room *)room;
+  Room *r = (Room *)room;
+  Client *c;
+  char *msg;
+  Dllist tmp;
+
+  while(1) {
+    pthread_mutex_lock(&r->mutex);
+    while(dll_empty(r->messages)) pthread_cond_wait(&r->cond, &r->mutex);
+    while(!dll_empty(r->messages)) {
+      msg = dll_first(r->messages)->val.s;
+      dll_traverse(tmp, r->clients) {
+        c = (Client*)tmp->val.v;
+        fputs(msg, c->fout);
+        fflush(c->fout);
+      }
+      free(msg);
+      dll_delete_node(r->messages->flink);
+    }
+    pthread_mutex_unlock(&r->mutex);
+  }
   return NULL;
 }
 
@@ -107,6 +126,7 @@ int user_prompt(Global_Vars *g, char *buf) {
 
 int print_rooms(Global_Vars *g, char *buf) {
   Room *r;
+  Client *c;
   JRB jtmp;
   Dllist dtmp;
   int len;
@@ -119,19 +139,21 @@ int print_rooms(Global_Vars *g, char *buf) {
     r = (Room *)jtmp->val.v;
     sprintf(buf, "%s:", jtmp->key.s);
     len = strlen(buf);
+    printf("length: %d\n", len);
     dll_traverse(dtmp, r->clients) {  // Print Clients
+      c = (Client *)dtmp->val.v;
       buf[len] = ' ';
-      strcat(buf + len + 1, dtmp->val.s);
-      len += strlen(dtmp->val.s);
+      strcat(buf + len + 1, c->name);
+      len += strlen(c->name) + 1;
+      // printf("buf: %s\n", buf);
     }
     buf[len] = '\n';
     // clang-format off
     if(fputs(buf, g->c->fout) < 0) { perror("fputs:"); return -1; }
     if(fflush(g->c->fout) < 0) { perror("fflush:"); return -1; }
     // clang-format on
-
-    return 0;
   }
+  return 0;
 }
 
 /* Called by main_thread to set up communication */
@@ -140,26 +162,42 @@ void *client_thread(void *arg) {
   Client *c = g->c;
   char buf[BUFSIZ];
 
-  if(print_rooms(g, buf) != 0) {           // Print rooms and clients in it
+  // Print rooms and clients in it
+  if(print_rooms(g, buf) != 0) {
     free_client(c);
-    g->c = NULL;
+    return NULL;
   }
-  if(user_prompt(g, buf) != 0) {  // Prompt user with username and Room
+  // Prompt user with username and Room
+  if(user_prompt(g, buf) != 0) {
     free_client(c);
-    g->c = NULL;
+    return NULL;
   }
 
+  dll_append(c->r->clients, new_jval_v((void *)c));
+
+  // Read input to start sending to Room
+  char msg[BUFSIZ + strlen(c->name) + 2];
+  while(fgets(buf, BUFSIZ, c->fin) != NULL) {
+    sprintf(msg, "%s: %s", c->name, buf);
+
+    pthread_mutex_lock(&c->r->mutex);
+    dll_append(c->r->messages, new_jval_s(strdup(msg)));
+    pthread_cond_signal(&c->r->cond);
+    pthread_mutex_unlock(&c->r->mutex);
+  }
+
+  // TODO Clean up when fgets reads NULL
   return NULL;
 }
 
-/* Loop indefinitely to accept & spawn client threads */
+// Loop indefinitely to accept & spawn client threads
 void *main_thread(void *arg) {
   Global_Vars *g = (Global_Vars *)arg;
   Client *c;
   pthread_t tid;
   int fd;
 
-  /* While loop to accept clients */
+  // While loop to accept clients
   while(1) {
     fd = accept_connection(g->sock);
     g->c = (c = make_client(fd));
@@ -196,7 +234,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  /* Call main thread to start accepting clients */
+  // Call main thread to start accepting clients
   if(pthread_create(&main_t, NULL, main_thread, (void *)g) != 0) {
     perror("main pthread create: ");
     exit(1);
@@ -207,10 +245,12 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  /* Freeing everything */
+  // Freeing everything
   for(i = 0; i < g->size; i++) {
-    free_dllist((g->room_arr + i)->clients);
-    free_dllist((g->room_arr + i)->messages);
+    free_dllist(g->room_arr[i].clients);
+    free_dllist(g->room_arr[i].messages);
+    pthread_mutex_destroy(&g->room_arr[i].mutex);
+    pthread_cond_destroy(&g->room_arr[i].cond);
   }
   free(g->room_arr);
   jrb_free_tree(g->rooms);
