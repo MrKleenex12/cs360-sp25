@@ -68,25 +68,25 @@ void *room_thread(void *room) {
 
 void user_prompt(Global_Vars *g, char *buf) {
   Client *c = (Client *)g->c;
-  int n_objects;
   int fd = fileno(c->fin);
+  int n_objects;
 
   // clang-format off
   if(write(fd, "\nEnter your chat name (no spaces):\n", 35) < 0) {
     perror("write:");
     exit(1);
   }
-
+  // Ask for Name
   if((n_objects = read(fd, buf, BUFSIZ)) < 0) { perror("read:"); exit(1); }
   buf[n_objects-1] = '\0'; // 0 termminate name
   c->name = strdup(buf);
-
+  // Ask for Chat Room
   if(write(fd, "Enter chat room:\n", 17) < 0) { perror("write:"); exit(1); }
   if((n_objects = read(fd, buf, BUFSIZ)) < 0) { perror("read:"); exit(1); }
   buf[n_objects-1] = '\0'; // 0 termminate Room name
-
   // clang-format on
 
+  // Check for correct Room name
   JRB tmp = jrb_find_str(g->rooms, buf);
   if(tmp != NULL) {
     c->r = (Room *)tmp->val.v;
@@ -96,34 +96,44 @@ void user_prompt(Global_Vars *g, char *buf) {
   }
 }
 
-/* Called by main_thread to set up communication */
-void *client_thread(void *arg) {
-  Global_Vars *g = (Global_Vars *)arg;
-  Client *c = (Client *)g->c;
+void print_rooms(Global_Vars *g, char *buf) {
   Room *r;
   JRB jtmp;
   Dllist dtmp;
-  char buf[BUFSIZ];
   int len;
 
-  // Print rooms and clients in it
-  fputs("Chat Rooms:\n\n", c->fout);
   jrb_traverse(jtmp, g->rooms) {
     r = (Room *)jtmp->val.v;
     sprintf(buf, "%s:", jtmp->key.s);
     len = strlen(buf);
-    // Print Clients
-    dll_traverse(dtmp, r->clients) {
+    dll_traverse(dtmp, r->clients) {  // Print Clients
       buf[len] = ' ';
       strcat(buf + len + 1, dtmp->val.s);
       len += strlen(dtmp->val.s);
     }
     buf[len] = '\n';
-    fputs(buf, c->fout);
-    fflush(c->fout);
+    // clang-format off
+    if(fputs(buf, g->c->fout) < 0) { perror("fputs:"); exit(1); }
+    if(fflush(g->c->fout) < 0) { perror("fflush:"); exit(1); }
+    // clang-format on
   }
+}
 
-  user_prompt(g, buf);
+/* Called by main_thread to set up communication */
+void *client_thread(void *arg) {
+  Global_Vars *g = (Global_Vars *)arg;
+  Client *c = g->c;
+  Room *r;
+  JRB jtmp;
+  Dllist dtmp;
+  char buf[BUFSIZ];
+
+  if(fputs("Chat Rooms:\n\n", c->fout) < 0) {
+    perror("fputs:");
+    exit(1);
+  }
+  print_rooms(g, buf);  // Print rooms and clients in it
+  user_prompt(g, buf);  // Prompt user with username and Room
   return NULL;
 }
 
