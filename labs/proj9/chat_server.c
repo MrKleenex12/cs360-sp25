@@ -22,6 +22,21 @@ typedef struct Client {
   Room *r;
 } Client;
 
+typedef struct Global_Vars {
+  Room *room_arr;
+  JRB rooms;
+  int sock;
+} Global_Vars;
+
+Global_Vars *make_gv(int argc, int port) {
+  Global_Vars *g = (Global_Vars *)malloc(sizeof(Global_Vars));
+
+  g->room_arr = (Room *)malloc(sizeof(Room) * (argc - 2));
+  g->rooms = make_jrb();
+  g->sock = serve_socket(port);
+  return g;
+}
+
 Client *make_client(int fd) {
   Client *c = (Client *)malloc(sizeof(Client));
   FILE *fin = fdopen(fd, "r");
@@ -64,76 +79,79 @@ void *process_connection(void *c) {
 void *client_thread() { return NULL; }
 
 /* Loop indefinitely to accept & spawn client threads */
-void *main_thread(void *s) {
-  Client *c;
+void *main_thread(void *arg) {
+  Global_Vars *g;
+  FILE *stdin_to_socket[2];
+  FILE *socket_to_stdout[2];
   pthread_t tid;
   char buf[BUFSIZ], *hn;
-  int sock, fd;
+  int fd;
 
-  sock = *((int *)s);
-  fd = accept_connection(sock);
-  c = make_client(fd);
+  g = (Global_Vars *)arg;
+  fd = accept_connection(g->sock);
 
+  FILE *fin = fdopen(fd, "r");
+  FILE *fout = fdopen(fd, "w");
+  stdin_to_socket[0] = stdin;
+  stdin_to_socket[1] = fout;
+  socket_to_stdout[0] = fin;
+  socket_to_stdout[1] = stdout;
+
+  /* Send starting messages on both sides */
   hn = getenv("USER");
-  /* Print out to terminal to start receiving input from Client */
   printf("Connection established: Server '%s'\nRecieving\n", hn);
-  /* Send to Client's terminal */
   sprintf(buf, "Recieving from Server: %s\n", hn);
   write(fd, buf, strlen(buf));
 
-  if(pthread_create(&tid, NULL, process_connection,
-                    (void *)c->socket_to_stdout) != 0) {
+  if(pthread_create(&tid, NULL, process_connection, (void *)socket_to_stdout) !=
+     0) {
     perror("main_thread pcreate:");
     exit(1);
   }
 
-  (void)process_connection(c->stdin_to_socket);
+  (void)process_connection(stdin_to_socket);
   exit(0);
 }
 
 int main(int argc, char **argv) {
-  JRB rooms;
-  Room *room_arr;
+  Global_Vars *g;
   pthread_t tid;
   char *name;
-  int i, port, sock;
+  int i, port;
   void *rv;
 
-  usage(argc, argv, &port); /* Error check usage and set port num */
+  usage(argc, argv, &port);  // Error check usage and set port num
+  g = make_gv(argc, port);   // Allocate memory for global variables
 
-  sock = serve_socket(port); /* Set up socket with the given port */
-
-  /* Make JRB and allocate memory for all Room pointers */
-  rooms = make_jrb();
-  room_arr = (Room *)malloc(sizeof(Room) * (argc - 2));
-  /* Insert each Room into JRB and set up dllists */
+  // Insert each Room into JRB and set up dllists
   for(i = 2; i < argc; i++) {
     name = strdup(argv[i]);
 
-    (room_arr + (i - 2))->clients = new_dllist();
-    (room_arr + (i - 2))->messages = new_dllist();
-    (room_arr + (i - 2))->name = name;
-    jrb_insert_str(rooms, name, new_jval_v((void *)room_arr + (i - 2)));
+    (g->room_arr + (i - 2))->clients = new_dllist();
+    (g->room_arr + (i - 2))->messages = new_dllist();
+    (g->room_arr + (i - 2))->name = name;
+    jrb_insert_str(g->rooms, name, new_jval_v((void *)g->room_arr + (i - 2)));
   }
 
-  // /* Call main thread to start accepting clients */
-  // if(pthread_create(&tid, NULL, main_thread, (void *)&sock) != 0) {
-  //   perror("main pthread create: ");
-  //   exit(1);
-  // }
+  /* Call main thread to start accepting clients */
+  if(pthread_create(&tid, NULL, main_thread, (void *)g) != 0) {
+    perror("main pthread create: ");
+    exit(1);
+  }
 
-  // if(pthread_join(tid, &rv) != 0) {
-  //   perror("main pthread join: ");
-  //   exit(1);
-  // }
+  if(pthread_join(tid, &rv) != 0) {
+    perror("main pthread join: ");
+    exit(1);
+  }
 
   /* Freeing everything */
   for(i = 0; i < argc - 2; i++) {
-    free_dllist((room_arr + i)->clients);
-    free_dllist((room_arr + i)->messages);
-    free((room_arr + i)->name);
+    free_dllist((g->room_arr + i)->clients);
+    free_dllist((g->room_arr + i)->messages);
+    free((g->room_arr + i)->name);
   }
-  free(room_arr);
-  jrb_free_tree(rooms);
+  free(g->room_arr);
+  jrb_free_tree(g->rooms);
+  free(g);
   return 0;
 }
