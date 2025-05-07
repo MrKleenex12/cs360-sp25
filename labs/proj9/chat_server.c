@@ -158,17 +158,8 @@ void *client_thread(void *arg) {
   Client *c = g->c;
   char buf[BUFSIZ];
 
-  // if(print_rooms(g, buf) < 0 || user_prompt(g, buf) < 0) {
-  //   free_client(c);
-  //   return NULL;
-  // }
-
   // Print rooms and check user name and room to join
-  if(print_rooms(g, buf) != 0) {
-    free_client(c);
-    return NULL;
-  }
-  if(user_prompt(g, buf) != 0) {
+  if(print_rooms(g, buf) < 0 || user_prompt(g, buf) < 0) {
     free_client(c);
     return NULL;
   }
